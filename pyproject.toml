@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-dreambait-nodes"
+description = "A collection of forks, QoL nodes and utilities for ComfyUI"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["opencv-python"]
+
+[project.urls]
+Repository = "https://github.com/drmbt/comfyui-dreambait-nodes"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "comfyui-dreambait-nodes"
+Icon = ""
