@@ -1,0 +1,760 @@
+{
+  "last_node_id": 42,
+  "last_link_id": 78,
+  "nodes": [
+    {
+      "id": 32,
+      "type": "Display Any (rgthree)",
+      "pos": [
+        1060,
+        180
+      ],
+      "size": {
+        "0": 210,
+        "1": 80
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 75,
+          "dir": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Display Any (rgthree)"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 33,
+      "type": "Display Any (rgthree)",
+      "pos": [
+        1060,
+        280
+      ],
+      "size": {
+        "0": 210,
+        "1": 80
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 76,
+          "dir": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Display Any (rgthree)"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 34,
+      "type": "Display Any (rgthree)",
+      "pos": [
+        1060,
+        380
+      ],
+      "size": {
+        "0": 210,
+        "1": 80
+      },
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 77,
+          "dir": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Display Any (rgthree)"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 18,
+      "type": "Get resolution [Crystools]",
+      "pos": [
+        1940,
+        60
+      ],
+      "size": {
+        "0": 210,
+        "1": 100
+      },
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Get resolution [Crystools]"
+      }
+    },
+    {
+      "id": 20,
+      "type": "PreviewImage",
+      "pos": [
+        1940,
+        220
+      ],
+      "size": {
+        "0": 210,
+        "1": 250
+      },
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 19
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 36,
+      "type": "Get resolution [Crystools]",
+      "pos": [
+        1700,
+        260
+      ],
+      "size": {
+        "0": 210,
+        "1": 100
+      },
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 45
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Get resolution [Crystools]"
+      }
+    },
+    {
+      "id": 35,
+      "type": "PreviewImage",
+      "pos": [
+        1700,
+        -20
+      ],
+      "size": {
+        "0": 210,
+        "1": 250
+      },
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 44
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 19,
+      "type": "MaskToImage",
+      "pos": [
+        1930,
+        -20
+      ],
+      "size": {
+        "0": 210,
+        "1": 30
+      },
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 46
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            19,
+            27
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MaskToImage"
+      }
+    },
+    {
+      "id": 39,
+      "type": "Get resolution [Crystools]",
+      "pos": [
+        1060,
+        -20
+      ],
+      "size": {
+        "0": 210,
+        "1": 100
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 73
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Get resolution [Crystools]"
+      }
+    },
+    {
+      "id": 37,
+      "type": "ImagePadForOutpaint",
+      "pos": [
+        1330,
+        -20
+      ],
+      "size": {
+        "0": 320,
+        "1": 170
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 68
+        },
+        {
+          "name": "left",
+          "type": "INT",
+          "link": 69,
+          "widget": {
+            "name": "left"
+          }
+        },
+        {
+          "name": "top",
+          "type": "INT",
+          "link": 70,
+          "widget": {
+            "name": "top"
+          },
+          "slot_index": 2
+        },
+        {
+          "name": "right",
+          "type": "INT",
+          "link": 71,
+          "widget": {
+            "name": "right"
+          }
+        },
+        {
+          "name": "bottom",
+          "type": "INT",
+          "link": 72,
+          "widget": {
+            "name": "bottom"
+          },
+          "slot_index": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            44,
+            45
+          ],
+          "shape": 3
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            46
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImagePadForOutpaint"
+      },
+      "widgets_values": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 42,
+      "type": "DRMBT_AspectPadImageForOutpainting",
+      "pos": [
+        714,
+        -20
+      ],
+      "size": {
+        "0": 315,
+        "1": 162
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 67
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            68,
+            73
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "LEFT",
+          "type": "INT",
+          "links": [
+            69,
+            74
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "TOP",
+          "type": "INT",
+          "links": [
+            70,
+            75
+          ],
+          "shape": 3,
+          "slot_index": 2
+        },
+        {
+          "name": "RIGHT",
+          "type": "INT",
+          "links": [
+            71,
+            76
+          ],
+          "shape": 3,
+          "slot_index": 3
+        },
+        {
+          "name": "BOTTOM",
+          "type": "INT",
+          "links": [
+            72,
+            77
+          ],
+          "shape": 3,
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DRMBT_AspectPadImageForOutpainting"
+      },
+      "widgets_values": [
+        "16-9_landscape_1344x768",
+        "center"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "Get resolution [Crystools]",
+      "pos": [
+        464,
+        -17
+      ],
+      "size": {
+        "0": 210,
+        "1": 100
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 65
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Get resolution [Crystools]"
+      }
+    },
+    {
+      "id": 10,
+      "type": "PreviewImage",
+      "pos": [
+        463,
+        129
+      ],
+      "size": {
+        "0": 210,
+        "1": 250
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 78
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 31,
+      "type": "Display Any (rgthree)",
+      "pos": [
+        1060,
+        100
+      ],
+      "size": {
+        "0": 210,
+        "1": 80
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 74,
+          "dir": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Display Any (rgthree)"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 41,
+      "type": "LoadImage",
+      "pos": [
+        98,
+        -21
+      ],
+      "size": {
+        "0": 320,
+        "1": 314
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            65,
+            67,
+            78
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    }
+  ],
+  "links": [
+    [
+      19,
+      19,
+      0,
+      20,
+      0,
+      "IMAGE"
+    ],
+    [
+      27,
+      19,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
+      44,
+      37,
+      0,
+      35,
+      0,
+      "IMAGE"
+    ],
+    [
+      45,
+      37,
+      0,
+      36,
+      0,
+      "IMAGE"
+    ],
+    [
+      46,
+      37,
+      1,
+      19,
+      0,
+      "MASK"
+    ],
+    [
+      65,
+      41,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      67,
+      41,
+      0,
+      42,
+      0,
+      "IMAGE"
+    ],
+    [
+      68,
+      42,
+      0,
+      37,
+      0,
+      "IMAGE"
+    ],
+    [
+      69,
+      42,
+      1,
+      37,
+      1,
+      "INT"
+    ],
+    [
+      70,
+      42,
+      2,
+      37,
+      2,
+      "INT"
+    ],
+    [
+      71,
+      42,
+      3,
+      37,
+      3,
+      "INT"
+    ],
+    [
+      72,
+      42,
+      4,
+      37,
+      4,
+      "INT"
+    ],
+    [
+      73,
+      42,
+      0,
+      39,
+      0,
+      "IMAGE"
+    ],
+    [
+      74,
+      42,
+      1,
+      31,
+      0,
+      "*"
+    ],
+    [
+      75,
+      42,
+      2,
+      32,
+      0,
+      "*"
+    ],
+    [
+      76,
+      42,
+      3,
+      33,
+      0,
+      "*"
+    ],
+    [
+      77,
+      42,
+      4,
+      34,
+      0,
+      "*"
+    ],
+    [
+      78,
+      41,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "0246.VERSION": [
+      0,
+      0,
+      4
+    ],
+    "ds": {
+      "scale": 1.2100000000000002,
+      "offset": [
+        140.66507324502248,
+        447.33648030766255
+      ]
+    }
+  },
+  "version": 0.4
+}

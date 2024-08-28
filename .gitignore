@@ -1,0 +1,17 @@
+__pycache__/
+.idea/
+.vscode/
+.tmp
+.cache
+config.ini
+snapshots/**
+startup-scripts/**
+.openart_key
+.youml
+matrix_auth
+channels.list
+comfyworkflows_sharekey
+github-stats-cache.json
+pip_overrides.json
+*.json
+check2.sh
