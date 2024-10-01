@@ -1,2 +1,3 @@
 opencv-python
 piexif
+py7zr
