@@ -1,12 +1,11 @@
 from PIL import Image, ImageOps, ImageSequence
 import os
-import subprocess
-from io import BytesIO
 import sys
 import json
 import piexif
 import hashlib
 from datetime import datetime
+import subprocess
 import torch
 import re
 import torch.nn.functional as F
@@ -25,59 +24,10 @@ import random
 import logging
 import tarfile
 import py7zr
-from fractions import Fraction
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# ffmpeg_path setup
-def ffmpeg_suitability(path):
-    try:
-        version = subprocess.run([path, "-version"], check=True, capture_output=True).stdout.decode("utf-8")
-    except:
-        return 0
-    score = 0
-    simple_criterion = [("libvpx", 20), ("264", 10), ("265", 3), ("svtav1", 5), ("libopus", 1)]
-    for criterion in simple_criterion:
-        if version.find(criterion[0]) >= 0:
-            score += criterion[1]
-    copyright_index = version.find('2000-2')
-    if copyright_index >= 0:
-        copyright_year = version[copyright_index + 6:copyright_index + 9]
-        if copyright_year.isnumeric():
-            score += int(copyright_year)
-    return score
-
-if "VHS_FORCE_FFMPEG_PATH" in os.environ:
-    ffmpeg_path = os.environ.get("VHS_FORCE_FFMPEG_PATH")
-else:
-    ffmpeg_paths = []
-    try:
-        from imageio_ffmpeg import get_ffmpeg_exe
-        imageio_ffmpeg_path = get_ffmpeg_exe()
-        ffmpeg_paths.append(imageio_ffmpeg_path)
-    except:
-        if "VHS_USE_IMAGEIO_FFMPEG" in os.environ:
-            raise
-        logger.warn("Failed to import imageio_ffmpeg")
-    if "VHS_USE_IMAGEIO_FFMPEG" in os.environ:
-        ffmpeg_path = imageio_ffmpeg_path
-    else:
-        system_ffmpeg = shutil.which("ffmpeg")
-        if system_ffmpeg is not None:
-            ffmpeg_paths.append(system_ffmpeg)
-        if os.path.isfile("ffmpeg"):
-            ffmpeg_paths.append(os.path.abspath("ffmpeg"))
-        if os.path.isfile("ffmpeg.exe"):
-            ffmpeg_paths.append(os.path.abspath("ffmpeg.exe"))
-        if len(ffmpeg_paths) == 0:
-            logger.error("No valid ffmpeg found.")
-            ffmpeg_path = None
-        elif len(ffmpeg_paths) == 1:
-            ffmpeg_path = ffmpeg_paths[0]
-        else:
-            ffmpeg_path = max(ffmpeg_paths, key=ffmpeg_suitability)
 
 class LoadMedia:
     """
@@ -109,8 +59,8 @@ class LoadMedia:
 
     CATEGORY = "image"
 
-    RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT", "INT", "STRING", "STRING", "STRING", "FLOAT", "AUDIO", "STRING", "METADATA_RAW")
-    RETURN_NAMES = ("image", "mask", "WIDTH", "HEIGHT", "COUNT", "FILE_NAME", "FILE_PATH", "PARENT_DIRECTORY", "FPS", "AUDIO", "PROMPT", "METADATA_RAW")
+    RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT", "INT", "STRING", "STRING", "STRING", "FLOAT", "AUDIO", "METADATA_RAW")
+    RETURN_NAMES = ("image", "mask", "WIDTH", "HEIGHT", "COUNT", "FILE_NAME", "FILE_PATH", "PARENT_DIRECTORY", "FPS", "AUDIO", "METADATA_RAW")
     FUNCTION = "load_media"
 
     @classmethod
@@ -152,8 +102,12 @@ class LoadMedia:
             dir_files = os.listdir(path)
             frame_count = len([f for f in dir_files if os.path.isfile(os.path.join(path, f))])
         elif path.lower().endswith(('.mp4', '.mov')):
-            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
-        elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
+            cap = cv2.VideoCapture(path)
+            if not cap.isOpened():
+                raise ValueError(f"Cannot open video file: {path}")
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+        elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):  # Add .7z support
             tmpdirname = self.create_persistent_temp_dir(os.path.splitext(os.path.basename(path))[0])
             if path.lower().endswith('.zip'):
                 with zipfile.ZipFile(path, 'r') as z:
@@ -203,7 +157,8 @@ class LoadMedia:
         elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):  # Add .7z support
             return self.load_images_from_archive(path=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, skip_n=skip_n, parent_directory=parent_directory)
         else:
-            return self.load_image(image=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)          
+            return self.load_image(image=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
+           
     def load_image(self, image, image_load_cap, start_index, resize_images_to_first, parent_directory):
         image_path = str(image).replace('"', "")
         if not image_path.startswith(("http://", "https://")):
@@ -239,6 +194,7 @@ class LoadMedia:
         
         file_name = os.path.basename(image_path).rsplit('.', 1)[0]
         return (image, mask, width, height, 1, file_name, image_path, parent_directory, 1.0, None, metadata)
+
     def load_images_from_folder(self, path, image_load_cap, start_index, skip_n, resize_images_to_first, seed, sort, reverse_order, parent_directory):
         if not os.path.isdir(path):
             raise FileNotFoundError(f"Folder '{path}' cannot be found.")
@@ -266,7 +222,7 @@ class LoadMedia:
             dir_files.reverse()
 
         dir_files = [os.path.normpath(os.path.join(path, x)).replace("\\", "/") for x in dir_files][start_index:]
-        print(f"!!!!!{dir_files}")
+
         if skip_n > 0:
             dir_files = dir_files[start_index::skip_n + 1]
         else:
@@ -300,15 +256,15 @@ class LoadMedia:
             raise ValueError(errmsg)
 
         images = [self.pil2tensor(img) for img in images]
-        print(f"!!!!!{images}")
         width, height = first_image_size  # Ensure width and height are assigned
         if len(images) == 1:
             image = images[0]
-            return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, prompts[0], metadata_list[0])
+            return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, metadata_list[0])
         images = torch.cat(images, dim=0)
-        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, 1.0, None, prompts, metadata_list)
+        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, 1.0, None, metadata_list)
+    
     def load_images_from_movie(self, path, image_load_cap, start_index, skip_n, reverse_order, resize_images_to_first, parent_directory):
-        images_from_movie, fps, audio, frame_count = self.extract_images_from_movie(movie_path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n)
+        images_from_movie, fps, audio = self.extract_images_from_movie(movie_path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n)
         if not images_from_movie:
             raise ValueError(f"No images extracted from movie file: {path}")
 
@@ -338,166 +294,99 @@ class LoadMedia:
             logger.error(errmsg)
             raise ValueError(errmsg)
 
+        if len(images) == 1:
+            image = images[0]
+            return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, fps, audio, metadata_list[0])
         images = torch.cat(images, dim=0)
-        return (images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, fps, audio, metadata_list)
+        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, fps, audio, metadata_list)
+
     def load_images_from_archive(self, path, image_load_cap, start_index, resize_images_to_first, seed, sort, reverse_order, skip_n, parent_directory):
         supported_image_formats = ('.png', '.jpg', '.jpeg', '.gif', '.tga', '.tiff', '.webp')
         supported_video_formats = ('.mp4', '.mov')
         valid_extensions = supported_image_formats + supported_video_formats
-        images, masks, file_path_list, file_name_list, file_name_list, metadata_list, prompts = [], [], [], [], []
+        images, masks, file_path_list, file_name_list, metadata_list, prompts = [], [], [], [], [], []
         first_image_size = None
 
-        if path.lower().endswith('.zip'):
-            with zipfile.ZipFile(path, 'r') as z:
-                file_names = [f for f in z.namelist() if f.lower().endswith(valid_extensions)]
-        elif path.lower().endswith('.7z'):
-            with py7zr.SevenZipFile(path, mode='r') as z:
-                file_names = [f for f in z.getnames() if f.lower().endswith(valid_extensions)]
-        else:
-            with tarfile.open(path, 'r') as t:
-                file_names = [f for f in t.getnames() if f.lower().endswith(valid_extensions)]
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            if path.lower().endswith('.zip'):
+                with zipfile.ZipFile(path, 'r') as archive:
+                    archive.extractall(tmpdirname)
+            elif path.lower().endswith('.7z'):  # Add .7z extraction logic
+                with py7zr.SevenZipFile(path, mode='r') as archive:
+                    archive.extractall(path=tmpdirname)
+            elif path.lower().endswith(('.tar', '.tar.gz', '.tar.bz2')):
+                with tarfile.open(path, 'r') as archive:
+                    archive.extractall(tmpdirname)
+            else:
+                raise ValueError(f"Unsupported archive format: {path}")
 
-        if sort == "alphabetical":
-            file_names.sort(key=lambda x: x.lower())
-        elif sort == "date_created":
-            file_names.sort(key=lambda x: os.path.getctime(os.path.join(path, x)))
-        elif sort == "date_modified":
-            file_names.sort(key=lambda x: os.path.getmtime(os.path.join(path, x)))
-        elif sort == "random":
-            random.seed(seed)
-            random.shuffle(file_names)
+            # Check if the extracted content is a single directory
+            extracted_items = os.listdir(tmpdirname)
+            if len(extracted_items) == 1 and os.path.isdir(os.path.join(tmpdirname, extracted_items[0])):
+                tmpdirname = os.path.join(tmpdirname, extracted_items[0])
 
-        if reverse_order:
-            file_names.reverse()
+            # Gather all files with valid extensions in the current directory
+            file_names = [os.path.join(tmpdirname, f) for f in os.listdir(tmpdirname) if any(f.lower().endswith(ext) for ext in valid_extensions)]
 
-        file_names = file_names[start_index:]
-        if skip_n > 0:
-            file_names = file_names[start_index::skip_n + 1]
-        else:
-            file_names = file_names[start_index:]
+            if len(file_names) == 0:
+                raise FileNotFoundError(f"No valid image or video files in archive '{path}'.")
 
-        if image_load_cap > 0:
-            file_names = file_names[:image_load_cap]
+            # Sorting logic
+            if sort == "alphabetical":
+                file_names.sort(key=lambda x: x.lower())
+            elif sort == "date_created":
+                file_names.sort(key=lambda x: os.path.getctime(x))
+            elif sort == "date_modified":
+                file_names.sort(key=lambda x: os.path.getmtime(x))
+            elif sort == "random":
+                random.seed(seed)
+                random.shuffle(file_names)
 
-        for file_name in file_names:
-            if file_name.lower().endswith(supported_video_formats):
-                return self.load_images_from_movie(path=file_name, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
-            elif file_name.lower().endswith(supported_image_formats):
-                if path.lower().endswith('.zip'):
-                    with zipfile.ZipFile(path, 'r') as z:
-                        with z.open(file_name) as f:
-                            i = Image.open(f)
-                elif path.lower().endswith('.7z'):
-                    with py7zr.SevenZipFile(path, mode='r') as z:
-                        with z.open(file_name) as f:
-                            i = Image.open(f)
-                else:
-                    with tarfile.open(path, 'r') as t:
-                        with t.extractfile(file_name) as f:
-                            i = Image.open(f)
+            if reverse_order:
+                file_names.reverse()
 
-                i = ImageOps.exif_transpose(i)
-                metadata = self.build_metadata(file_name, i)
-                if first_image_size is None:
-                    first_image_size = i.size
-                if i.size == first_image_size or resize_images_to_first:
-                    img = i if i.size == first_image_size else self.resize_right(i, first_image_size)
-                    images.append(img)
-                    masks.append(torch.zeros((64, 64), dtype=torch.float32, device="cpu"))
-                    file_path_list.append(file_name)
-                    file_name_list.append(os.path.basename(file_name).rsplit('.', 1)[0])
-                    metadata_list.append(metadata)
-                    prompts.append(self.extract_positive_prompt(metadata))
+            if skip_n > 0:
+                file_names = file_names[start_index::skip_n + 1] if skip_n > 0 else file_names[start_index:]
 
-        if not images:
-            errmsg = f"No valid images found in archive '{path}'!"
-            logger.error(errmsg)
-            raise ValueError(errmsg)
+                if image_load_cap > 0:
+                    file_names = file_names[:image_load_cap]
+                for file_name in file_names:
+                    if file_name.lower().endswith(supported_video_formats):
+                        return self.load_images_from_movie(path=file_name, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
+                    elif file_name.lower().endswith(supported_image_formats):
+                        i = Image.open(file_name)
+                        i = ImageOps.exif_transpose(i)
+                        metadata = self.build_metadata(file_name, i)
+                        if first_image_size is None:
+                            first_image_size = i.size
+                        if i.size == first_image_size or resize_images_to_first:
+                            img = i if i.size == first_image_size else self.resize_right(i, first_image_size)
+                            images.append(img)
+                            masks.append(torch.zeros((64, 64), dtype=torch.float32, device="cpu"))
+                            file_path_list.append(file_name)
+                            file_name_list.append(os.path.basename(file_name).rsplit('.', 1)[0])
+                            metadata_list.append(metadata)
+                            prompts.append(self.extract_positive_prompt(metadata))
 
-        images = [self.pil2tensor(img) for img in images]
-        width, height = first_image_size
-        if len(images) == 1:
-            image = images[0]
-            return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, metadata_list[0])
-        images = torch.cat(images, dim=0)
-        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, 1.0, None, metadata_list)
+            if not images:
+                errmsg = f"No valid images found in archive '{path}'!"
+                logger.error(errmsg)
+                raise ValueError(errmsg)
 
+            images = [self.pil2tensor(img) for img in images]
+            width, height = first_image_size  # Ensure width and height are assigned
+            if len(images) == 1:
+                image = images[0]
+                return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, metadata_list[0])
+            images = torch.cat(images, dim=0)
+            return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, 1.0, None, metadata_list)
 
     def extract_images_from_movie(self, movie_path, image_load_cap, start_index, skip_n):
-    #    Check if ffmpeg is available in the system's PATH
-        ffmpeg_path = shutil.which("ffmpeg")
-        ffprobe_path = shutil.which("ffprobe")
-
-        if not ffmpeg_path:
-            raise FileNotFoundError("ffmpeg executable not found. Please ensure it is installed and the path is correct.")
-        if not ffprobe_path:
-            raise FileNotFoundError("ffprobe executable not found. Please ensure it is installed and the path is correct.")
-
-        try:
-            # Get frame count and FPS using ffprobe
-            probe_args = [
-                ffprobe_path, 
-                "-v", "error", 
-                "-select_streams", "v:0", 
-                "-count_frames", 
-                "-show_entries", "stream=nb_read_frames,r_frame_rate", 
-                "-of", "default=nokey=1:noprint_wrappers=1", 
-                movie_path
-            ]
-            probe_result = subprocess.run(probe_args, capture_output=True, text=True, check=True)
-            output = probe_result.stdout.strip().split('\n')
-            frame_count = int(output[1])  # Convert frame count to int
-            fps = float(Fraction(output[0]))  # Convert fps string to float
-        #     print(f"!!!!! frame_count: {frame_count}")
-        #     print(f"!!!!! fps: {fps}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to probe video file: {e.stderr}")
-            # Fallback to old method
-            frame_count = 0
-            fps = 30.0  # Default FPS
-
-        # if frame_count == 0:
-            # Fallback method to get frame count and fps
-        #     args = [ffmpeg_path, "-i", movie_path]
-        #     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #     stderr = process.communicate()[1].decode('utf-8')
-        #     for line in stderr.split('\n'):
-        #         if 'Duration' in line:
-        #             duration = line.split('Duration: ')[1].split(',')[0]
-        #             hours, minutes, seconds = map(float, duration.split(':'))
-        #             total_seconds = hours * 3600 + minutes * 60 + seconds
-        #         if 'Stream' in line and 'Video' in line:
-        #             fps = float(Fraction(line.split('fps,')[0].split()[-1]))
-        #     frame_count = int(total_seconds * fps)
-        #     print(f"!!!!! frame_count (fallback): {frame_count}")
-        #     print(f"!!!!! fps (fallback): {fps}")
-
-        # # Adjust start_index and skip_n
-        # start_frame = start_index
-        # if skip_n > 0:
-        #     start_frame = start_index * (skip_n + 1)
-
-        # args = [ffmpeg_path, "-i", movie_path, "-vf", f"select='not(mod(n\\,{skip_n+1}))'", "-vsync", "vfr", "-q:v", "2", "-f", "image2pipe", "-vcodec", "png", "-"]
-        # process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # images = []
-        # while True:
-        #     data = process.stdout.read(1024 * 1024)  # Read in larger chunks
-        #     if not data:
-        #         break
-        #     try:
-        #         img = Image.open(BytesIO(data))
-        #         images.append(img)
-        #         if image_load_cap > 0 and len(images) >= image_load_cap:
-        #             break
-        #     except Image.UnidentifiedImageError:
-        #         continue  # Skip any data that cannot be identified as an image
-        # process.stdout.close()
-        # process.wait()
         cap = cv2.VideoCapture(movie_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video file: {movie_path}")
 
-       # fps = cap.get(cv2.CAP_PROP_FPS)
+        fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         audio = None
 
@@ -519,22 +408,15 @@ class LoadMedia:
 
         # Extract audio if available
         audio = lazy_get_audio(movie_path, start_time=0, duration=total_frames / fps)
-        frame_count = total_frames
-        #audio = lazy_get_audio(movie_path, start_time=0, duration=len(images) / fps)
-        return images, fps, audio, frame_count
-    def pil2tensor(self, x):
-        return torch.from_numpy(np.array(x).astype(np.float32) / 255.0).unsqueeze(0)
 
-    def resize_right(self, image, target_size):
-        img_ratio = image.width / image.height
-        target_ratio = target_size[0] / target_size[1]
-        resize_width, resize_height = (
-            (target_size[0], round(target_size[0] / img_ratio)) if target_ratio > img_ratio else
-            (round(target_size[1] * img_ratio), target_size[1])
-        )
-        image = image.resize((resize_width, resize_height), Image.Resampling.LANCZOS)
-        x_crop, y_crop = (resize_width - target_size[0]) // 2, (resize_height - target_size[1]) // 2
-        return image.crop((x_crop, y_crop, x_crop + target_size[0], y_crop + target_size[1]))
+        return images, fps, audio
+
+    def pil2tensor(self, img):
+        img = np.array(img).astype(np.float32) / 255.0
+        return torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)
+
+    def resize_right(self, img, size):
+        return img.resize(size, Image.LANCZOS)
 
     def build_metadata(self, image_path, img):
         metadata = {}
@@ -590,7 +472,6 @@ class LazyAudioMap:
 
 def lazy_get_audio(file, start_time=0, duration=0):
     return LazyAudioMap(file, start_time, duration)
-
 def get_audio(file, start_time=0, duration=0):
     args = [ffmpeg_path, "-i", file]
     if start_time > 0:
@@ -611,4 +492,3 @@ def get_audio(file, start_time=0, duration=0):
         ac = 2
     audio = audio.reshape((-1, ac)).transpose(0, 1).unsqueeze(0)
     return {'waveform': audio, 'sample_rate': ar}
-

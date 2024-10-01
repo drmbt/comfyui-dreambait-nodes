@@ -1,23 +1,59 @@
+from .utils import any_typ
 class DRMBT_String_Item_Menu:
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "menu_list": ("STRING", {"tooltip": "Input string to be split into menu items."}),
-                "delimiter": ("STRING", {"default": ",", "tooltip": "Delimiter to split the input string."}),
-                "selected_item": ("STRING", {"tooltip": "Selected item from the menu."})
+                "menu": (
+                    "STRING", 
+                    {
+                        "default": "",
+                        "multiline": True, 
+                        "tooltip": "The text to be split into a list by the delimiter."
+                    }
+                ),
+                "delimiter": (
+                    "STRING", 
+                    {
+                        "default": ",", 
+                        "tooltip": "Delimiter to split the input string."
+                    }
+                ),
+                "select_item": (
+                    "STRING", 
+                    {
+                        "default": '', 
+                        "tooltip": "Select item and index by name from the menu."
+                    }
+                )
+            },
+            "optional": {
+                "int_select": (
+                    "INT", 
+                    {
+                        "default": -1, 
+                        "min": 0, 
+                        "step": 1, 
+                        "defaultInput": True,
+                        "tooltip": "Input string to be split into menu items."
+                    }
+                )
             }
         }
 
     RETURN_TYPES = ("STRING", "INT")
-    FUNCTION = "select_model_context"
+    RETURN_NAMES = ("output_string", "index")
+    FUNCTION = "parse_list"
+    CATEGORY = "string selection"
+    DESCRIPTION = "returns a string or int by selection"
 
-    CATEGORY = "model_context"
-    DESCRIPTION = "Selects a model context from a dynamically generated list and outputs the selected value and its index."
-
-    def select_model_context(self, menu_list, delimiter=",", selected_item=""):
-        model_context_list = menu_list.split(delimiter)
-        if selected_item not in model_context_list:
-            selected_item = model_context_list[0]  # Default to the first item if the selected item is not in the list
-        selected_index = model_context_list.index(selected_item)
-        return (selected_item, selected_index)
+    def parse_list(self, menu, delimiter, select_item, int_select=-1):
+        menu_list = menu.split(delimiter)
+        if int_select <0:
+            if select_item not in menu_list:
+                select_item = menu_list[0]  # Default to the first item if the selected item is not in the list
+            select_index = menu_list.index(select_item)
+        else:
+            select_item = menu_list[int_select]
+            select_index = int_select
+        return (select_item, select_index)
