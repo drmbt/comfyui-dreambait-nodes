@@ -54,7 +54,7 @@ class NumberPlusPlus:
                         "default": 0.0,
                         "defaultInput": True,
                         "tooltip": "add to value after multiplying"
-                    }
+                    },
                 )
             },
             "hidden": {
@@ -62,8 +62,8 @@ class NumberPlusPlus:
                 "extra_pnginfo": "EXTRA_PNGINFO"
             },
         }
-    RETURN_TYPES = ("FLOAT", "INT", "STRING", "STRING", "FLOAT", "FLOAT", "FLOAT")
-    RETURN_NAMES = ("output_number", "output_int", "float_string", "int_string", "pre_add", "multiplier", "post_add")
+    RETURN_TYPES = ("FLOAT", "INT", "BOOLEAN", "STRING", "STRING", "FLOAT", "FLOAT", "FLOAT")
+    RETURN_NAMES = ("output_number", "output_int", "bool>0", "float_string", "int_string", "pre_add", "multiplier", "post_add")
     OUTPUT_NODE = True
     FUNCTION = "number_operation"
     CATEGORY = "DRMBT nodes"
@@ -94,16 +94,17 @@ class NumberPlusPlus:
             output_int = int(math.ceil(output_number))
         float_string = f"{output_number:.2f}"
         int_string = f"{output_int:.0f}"
-
+        bool = output_number>0
         return {
             "ui": {
                 "output_number": [output_number],  # Ensure these are lists
-                "output_int": [output_int],        # Ensure these are lists
+                "output_int": [output_int],
+                "bool>0": [bool],                  # Ensure these are lists
                 "float_string": [float_string],    # Ensure these are lists
                 "int_string": [int_string],        # Ensure these are lists
                 "pre_add": [pre_add],              # Ensure these are lists
                 "multiplier": [multiplier],        # Ensure these are lists
                 "post_add": [post_add]
             },
-            "result": (output_number, output_int, float_string, int_string, pre_add, multiplier, post_add)
+            "result": (output_number, output_int, bool, float_string, int_string, pre_add, multiplier, post_add)
         }
