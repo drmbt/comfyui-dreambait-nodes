@@ -8,6 +8,7 @@ from .nodes.plot_parameters import PlotParametersDRMBT
 from .nodes.DRMBT_execution_time import ExecutionTime
 from .nodes.TextPlusPlus import TextPlusPlus
 from .nodes.NumberPlusPlus import NumberPlusPlus
+from .nodes.NumberRemap import NumberRemap
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -18,7 +19,8 @@ NODE_CLASS_MAPPINGS = {
     "DRMBT_PlotParameters": PlotParametersDRMBT,
     "DRMBT_ExecutionTime" : ExecutionTime,
     "TextPlusPlus": TextPlusPlus,
-    "NumberPlusPlus": NumberPlusPlus
+    "NumberPlusPlus": NumberPlusPlus,
+    "NumberRemap": NumberRemap
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -30,5 +32,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DRMBT_PlotParameters": "Plot Parameters",
     "DRMBT_ExecutionTime" : "DRMBT_ExecutionTime",
     "TextPlusPlus": "Text ++",
-    "NumberPlusPlus": "Number ++"
+    "NumberPlusPlus": "Number ++",
+    "NumberRemap": "Number Remap Range"
 }
