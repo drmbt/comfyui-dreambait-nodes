@@ -92,7 +92,7 @@ class NumberPlusPlus:
             output_int = int(math.floor(output_number))
         elif integer == "ceiling":
             output_int = int(math.ceil(output_number))
-        float_string = f"{output_number:.2f}"
+        float_string = f"{output_number:.3f}"
         int_string = f"{output_int:.0f}"
         bool = output_number>0
         return {
