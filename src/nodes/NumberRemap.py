@@ -104,7 +104,7 @@ class NumberRemap:
             override = change_dict['override_number']
             mult = float(change_dict['pre_multiply'])
             if override is not None:
-                number = float(override) ^ mult
+                number = float(override) * mult
 
         output_number = (number*pre_multiply - from_range_min) / (from_range_max - from_range_min) * (to_range_max - to_range_min) + to_range_min
         if clamp_min is not None:
