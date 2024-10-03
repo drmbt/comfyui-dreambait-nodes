@@ -9,6 +9,8 @@ from .nodes.DRMBT_execution_time import ExecutionTime
 from .nodes.TextPlusPlus import TextPlusPlus
 from .nodes.NumberPlusPlus import NumberPlusPlus
 from .nodes.NumberRemap import NumberRemap
+from .nodes.BoolPlusPlus import BoolPlusPlus
+from .nodes.SwitchDuo import SwitchDuo
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -20,7 +22,9 @@ NODE_CLASS_MAPPINGS = {
     "DRMBT_ExecutionTime" : ExecutionTime,
     "TextPlusPlus": TextPlusPlus,
     "NumberPlusPlus": NumberPlusPlus,
-    "NumberRemap": NumberRemap
+    "NumberRemap": NumberRemap,
+    "BoolPlusPlus": BoolPlusPlus,
+    "SwitchDuo": SwitchDuo
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -33,5 +37,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DRMBT_ExecutionTime" : "DRMBT_ExecutionTime",
     "TextPlusPlus": "Text ++",
     "NumberPlusPlus": "Number ++",
-    "NumberRemap": "Number Remap Range"
+    "NumberRemap": "Number Remap Range",
+    "BoolPlusPlus": "BOOL ++",
+    "SwitchDuo": "Switch Duo"
 }
