@@ -92,7 +92,7 @@ class NumberRemap:
     CATEGORY = "DRMBT nodes"
     
     @classmethod
-    def IS_CHANGED(self, pre_multiply, override_number):
+    def IS_CHANGED(self, number, pre_multiply, override_number, from_range_min, from_range_max, to_range_min, to_range_max, clamp_min, clamp_max):
         m = hashlib.sha256()
         dummy = str(float(pre_multiply))
         m.update(dummy.encode("utf-8"))

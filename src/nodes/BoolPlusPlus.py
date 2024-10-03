@@ -106,7 +106,6 @@ class BoolPlusPlus:
                     pass
         output_any = boolean
         output_bool = boolean
-        print(f"!!!{boolean}")
         if override_bool is not None and isinstance(override_bool, (bool, int, float)):
             boolean = bool(override_bool)
         elif isinstance(boolean, str):
@@ -114,7 +113,6 @@ class BoolPlusPlus:
                 boolean = False
             else:
                 boolean = True
-        print(f"!!! trigger {boolean}, {output_bool}")
         if boolean is False:
             if isinstance(on_false, (bool, int, float)):
                 output_int = int(on_false)
