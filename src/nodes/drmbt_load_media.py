@@ -26,10 +26,26 @@ import logging
 import tarfile
 import py7zr
 from fractions import Fraction
+import numpy as np
+from scipy.spatial.distance import pdist, squareform
+from scipy.optimize import linear_sum_assignment
+import itertools
+import time
+import argparse
+from torchvision.transforms import ToTensor, ToPILImage
+import torch.nn.functional as F
+from tqdm import tqdm
+import subprocess
+from .sort_visual_path import main as sort_visual_path_main
 
 # Initialize logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+# This script steals from all the major image loader nodes, and incorporates @eden_comfy_nodes @aixander's 
+# sort_visual_path travelling salesman script for visually sorting an image sequence
+
 
 # ffmpeg_path setup
 def ffmpeg_suitability(path):
@@ -79,6 +95,48 @@ else:
         else:
             ffmpeg_path = max(ffmpeg_paths, key=ffmpeg_suitability)
 
+def resize_images_to_common_size(images, target_size):
+    resized_images = []
+    for image in images:
+        resized_image = image.resize(target_size, Image.Resampling.LANCZOS)
+        resized_images.append(resized_image)
+    return resized_images
+
+def calculate_image_distances(images):
+    # Determine a common size (e.g., the size of the first image)
+    target_size = images[0].size
+    # Resize all images to the common size
+    resized_images = resize_images_to_common_size(images, target_size)
+    # Convert each image to a consistent format and flatten it
+    features = [np.array(image.convert("RGB")).flatten() for image in resized_images]
+    # Ensure the features are in a 2D array format
+    features_array = np.array(features)
+    # Calculate the distance matrix
+    distance_matrix = squareform(pdist(features_array, 'euclidean'))
+    return distance_matrix
+
+def sort_visual_path(images, filenames):
+    # Calculate the distance matrix
+    distance_matrix = calculate_image_distances(images)
+    # Solve the TSP problem using linear sum assignment
+    row_ind, col_ind = linear_sum_assignment(distance_matrix)
+    # Return the sorted filenames based on the sorted indices
+    sorted_filenames = [filenames[i] for i in col_ind]
+    return sorted_filenames
+
+def run_sort_visual_path(directory):
+    # Run the sort_visual_path.py script and capture its output
+    result = subprocess.run(
+        [sys.executable, "sort_visual_path.py", "--directory", directory, "--list_only"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        logger.error(f"Error running sort_visual_path.py: {result.stderr}")
+        raise RuntimeError("Failed to sort visual path")
+    # Parse the output into a list of file paths
+    sorted_paths = resul
+
 class LoadMedia:
     """
     Loads media from a specified path, which can be an image path or directory of images, a video file, zip archive or a URL.
@@ -99,11 +157,12 @@ class LoadMedia:
                 "image_load_cap": ("INT", {"default": 0, "min": 0, "step": 1}),
                 "start_index": ("INT", {"default": 0, "min": 0, "step": 1}),
                 "start_index_use_seed": ("BOOLEAN", {"default": False, "tooltip": "Use seed as the start_index value."}),
+                "seed": ("INT",{"default": 0}),
                 "error_after_last_frame": ("BOOLEAN", {"default": False, "tooltip": "Raise an exception if start_index > COUNT, otherwise use start_index % COUNT."}),
                 "skip_n": ("INT", {"default": 0, "min": 0, "step": 1, "tooltip": "Number of images to skip. 0 means no skipping."}),
-                "sort": (["None", "alphabetical", "date_created", "date_modified", "random"], {"default": "None", "tooltip": "sort method for multi image inputs"}),
+                "sort": (["None", "alphabetical", "date_created", "date_modified", "visual_path", "random"], {"default": "None", "tooltip": "sort method for multi image inputs"}),
                 "reverse_order": ("BOOLEAN", {"default": False}),
-                "seed": ("INT",{"default": 0}),
+                "loop_first_frame": ("BOOLEAN", {"default": False, "tooltip": "Repeat the first frame as the last frame."})
             }
         }
 
@@ -113,30 +172,29 @@ class LoadMedia:
     RETURN_NAMES = ("image", "mask", "WIDTH", "HEIGHT", "COUNT", "FILE_NAME", "FILE_PATH", "PARENT_DIRECTORY", "FPS", "AUDIO", "PROMPT", "METADATA_RAW")
     FUNCTION = "load_media"
 
-    @classmethod
-    def IS_CHANGED(cls, path, resize_images_to_first, image_load_cap, start_index, start_index_use_seed, sort, seed, reverse_order):
-        path = str(path).replace('"', "")
-        if not path.startswith(("http://", "https://")):
-            path = os.path.normpath(path).replace("\\", "/")
-        m = hashlib.sha256()
-        if not path.startswith(("http://", "https://")):
-            with open(path, 'rb') as f:
-                m.update(f.read())
-            return m.digest().hex()
-        else:
-            m.update(path.encode("utf-8"))
-            return m.digest().hex()
+    # @classmethod
+    # def IS_CHANGED(cls, path, resize_images_to_first, image_load_cap, start_index, start_index_use_seed, sort, seed, reverse_order):
+    #     path = str(path).replace('"', "")
+    #     if not path.startswith(("http://", "https://")):
+    #         path = os.path.normpath(path).replace("\\", "/")
+    #     m = hashlib.sha256()
+    #     if not path.startswith(("http://", "https://")):
+    #         with open(path, 'rb') as f:
+    #             m.update(f.read())
+    #         return m.digest().hex()
+    #     else:
+    #         m.update(path.encode("utf-8"))
+    #         return m.digest().hex()
         
-    def load_media(self, path, seed, image_load_cap, start_index, start_index_use_seed, error_after_last_frame, skip_n, resize_images_to_first, sort, reverse_order):
+    def load_media(self, path, seed, image_load_cap, start_index, start_index_use_seed, error_after_last_frame, skip_n, resize_images_to_first, sort, reverse_order, loop_first_frame):
         if start_index_use_seed:
             start_index = seed
-
+        path = path.strip('"').strip("'")
+        # Handle URL downloads
         if path.startswith(("http://", "https://")):
             local_filename = self.get_local_file_path(path)
-            print(f"!!!!! URL provided: {path}")
             if not os.path.exists(local_filename):
                 self.download_file(path, local_filename)
-            print(f"!!!!! Downloaded file: {local_filename}")
             path = local_filename
         else:
             path = os.path.normpath(path)
@@ -146,41 +204,49 @@ class LoadMedia:
             parent_directory = path
         else:
             parent_directory = os.path.dirname(path)
-        print(f"!!!!! Path for processing: {path}")
 
+        # Handle directories
         if os.path.isdir(path):
             dir_files = os.listdir(path)
             frame_count = len([f for f in dir_files if os.path.isfile(os.path.join(path, f))])
+        # Handle video files
         elif path.lower().endswith(('.mp4', '.mov')):
-            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
+            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+        # Handle archive files
         elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
             tmpdirname = self.create_persistent_temp_dir(os.path.splitext(os.path.basename(path))[0])
+            logger.debug(f"Extracting archive to temporary directory: {tmpdirname}")
             if path.lower().endswith('.zip'):
                 with zipfile.ZipFile(path, 'r') as z:
                     z.extractall(tmpdirname)
-                    frame_count = len([f for f in z.namelist() if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.tga', '.tiff', '.webp'))])
-            elif path.lower().endswith('.7z'):  # Add .7z extraction logic
+            elif path.lower().endswith('.7z'):
                 with py7zr.SevenZipFile(path, mode='r') as z:
                     z.extractall(path=tmpdirname)
-                    frame_count = len([f for f in z.getnames() if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.tga', '.tiff', '.webp', '.mp4', '.mov'))])
             else:
                 with tarfile.open(path, 'r') as t:
                     t.extractall(tmpdirname)
-                    frame_count = len([f for f in t.getnames() if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.tga', '.tiff', '.webp'))])
-            print(f"!!!!! Extracted to persistent directory: {tmpdirname}")
-            path = tmpdirname  # Update path to the persistent directory
 
-            # Check if the extracted content is a single directory
+            # Verify extraction
+            logger.debug(f"Contents of {tmpdirname}: {os.listdir(tmpdirname)}")
             extracted_items = os.listdir(tmpdirname)
-            print(f"!!!!! Extracted items: {extracted_items}")
             if len(extracted_items) == 1 and os.path.isdir(os.path.join(tmpdirname, extracted_items[0])):
+                # If there's only one directory, update the path to that directory
                 tmpdirname = os.path.join(tmpdirname, extracted_items[0])
-                print(f"!!!!! Updated path to single extracted directory: {tmpdirname}")
+                logger.debug(f"Single directory found, updating path to: {tmpdirname}")
             path = tmpdirname
             parent_directory = path  # Update parent_directory to the extracted directory
-
+            frame_count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
         else:
             frame_count = 1
+
+        # Check for subfolder if no frames found
+        if frame_count == 0:
+            logger.debug(f"No frames found in {path}. Checking for subfolders.")
+            subdirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+            if len(subdirs) == 1:
+                path = os.path.join(path, subdirs[0])
+                logger.debug(f"Subfolder found, updating path to: {path}")
+                frame_count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
 
         if frame_count == 0:
             raise ValueError(f"No valid frames found in the provided path: {path}")
@@ -192,18 +258,32 @@ class LoadMedia:
                 start_index = start_index % frame_count
 
         if os.path.isdir(path):
-            extracted_items = os.listdir(path)
-            if extracted_items:
-                first_item = extracted_items[0]
-                if first_item.lower().endswith(('.mp4', '.mov')):
-                    return self.load_images_from_movie(path=os.path.join(path, first_item), image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
-            return self.load_images_from_folder(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, parent_directory=parent_directory)
+            return self.load_images_from_folder(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
         elif path.lower().endswith(('.mp4', '.mov')):
-            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
-        elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):  # Add .7z support
-            return self.load_images_from_archive(path=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, skip_n=skip_n, parent_directory=parent_directory)
+            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+        elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
+            return self.load_images_from_archive(path=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, skip_n=skip_n, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
         else:
-            return self.load_image(image=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)          
+            return self.load_image(image=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
+
+    def get_local_file_path(self, url):
+        # Extract the file extension from the URL
+        extension = os.path.splitext(url)[-1]
+        # Create a local file path with the extension
+        return os.path.join(tempfile.gettempdir(), hashlib.sha256(url.encode()).hexdigest() + extension)
+
+    def download_file(self, url, local_filename):
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(local_filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+    def create_persistent_temp_dir(self, name):
+        temp_dir = os.path.join(tempfile.gettempdir(), name)
+        os.makedirs(temp_dir, exist_ok=True)
+        return temp_dir
+
     def load_image(self, image, image_load_cap, start_index, resize_images_to_first, parent_directory):
         image_path = str(image).replace('"', "")
         if not image_path.startswith(("http://", "https://")):
@@ -239,17 +319,43 @@ class LoadMedia:
         
         file_name = os.path.basename(image_path).rsplit('.', 1)[0]
         return (image, mask, width, height, 1, file_name, image_path, parent_directory, 1.0, None, metadata)
-    def load_images_from_folder(self, path, image_load_cap, start_index, skip_n, resize_images_to_first, seed, sort, reverse_order, parent_directory):
+
+    def load_images_from_folder(self, path, image_load_cap, start_index, skip_n, resize_images_to_first, seed, sort, reverse_order, parent_directory, loop_first_frame):
+        # Strip quotes from the path if present
+        path = path.strip('"').strip("'")
+        
         if not os.path.isdir(path):
             raise FileNotFoundError(f"Folder '{path}' cannot be found.")
         dir_files = os.listdir(path)
         if len(dir_files) == 0:
             raise FileNotFoundError(f"No files in directory '{path}'.")
 
-        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp','.mp4', '.mov']
         dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in valid_extensions)]
+        
+        # Check if the first file is a movie
+        if dir_files and dir_files[0].lower().endswith(('.mp4', '.mov')):
+            images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, fps, audio, metadata_list = self.load_images_from_movie(
+                path=os.path.join(path, dir_files[0]),
+                image_load_cap=image_load_cap,
+                start_index=start_index,
+                skip_n=skip_n,
+                reverse_order=reverse_order,
+                resize_images_to_first=resize_images_to_first,
+                parent_directory=parent_directory,
+                sort=sort
+            )
+            # Update frame_count to reflect the actual number of frames when skip_n is used
+            if skip_n > 0:
+                frame_count = len(images)
+            return images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, fps, audio, metadata_list
+
         if len(dir_files) == 0:
             raise FileNotFoundError(f"No valid image files in directory '{path}'.")
+
+        # Determine width and height for target_n_pixels
+        width, height = 1920, 1200  # Example default values; replace with actual logic to determine these
+        target_n_pixels = width * height
 
         # Sorting logic
         if sort == "alphabetical":
@@ -261,12 +367,16 @@ class LoadMedia:
         elif sort == "random":
             random.seed(seed)
             random.shuffle(dir_files)
-
+        elif sort == "visual_path":
+            # Call the main function from sort_visual_path.py
+            dir_files = sort_visual_path_main(path, target_n_pixels=target_n_pixels, list_only=False)
+            print(f"!!!! 367  {dir_files}")
+        
         if reverse_order:
             dir_files.reverse()
-
+        print(f"!!! 371 {dir_files}")
         dir_files = [os.path.normpath(os.path.join(path, x)).replace("\\", "/") for x in dir_files][start_index:]
-        print(f"!!!!!{dir_files}")
+        print(f"!!!! 373  {dir_files}")
         if skip_n > 0:
             dir_files = dir_files[start_index::skip_n + 1]
         else:
@@ -293,6 +403,16 @@ class LoadMedia:
                 file_name_list.append(os.path.basename(image_path).rsplit('.', 1)[0])
                 metadata_list.append(metadata)
                 prompts.append(self.extract_positive_prompt(metadata))
+           
+        print(f"!!!! 375  file_name_list: {file_name_list}")
+        # Append the first frame to the end if loop_first_frame is True
+        if loop_first_frame and images:
+            images.append(images[0])
+            masks.append(masks[0])
+            file_path_list.append(file_path_list[0])
+            file_name_list.append(file_name_list[0])
+            metadata_list.append(metadata_list[0])
+            prompts.append(prompts[0])
 
         if not images:
             errmsg = f"No valid images found in directory '{path}'!"
@@ -300,18 +420,26 @@ class LoadMedia:
             raise ValueError(errmsg)
 
         images = [self.pil2tensor(img) for img in images]
-        print(f"!!!!!{images}")
         width, height = first_image_size  # Ensure width and height are assigned
+        frame_count = len(images)
         if len(images) == 1:
             image = images[0]
-            return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, prompts[0], metadata_list[0])
+            return (image, masks[0], width, height, frame_count, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, prompts[0], metadata_list[0])
         images = torch.cat(images, dim=0)
-        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, 1.0, None, prompts, metadata_list)
-    def load_images_from_movie(self, path, image_load_cap, start_index, skip_n, reverse_order, resize_images_to_first, parent_directory):
+        return (images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, 1.0, None, prompts, metadata_list)
+    def load_images_from_movie(self, path, image_load_cap, start_index, skip_n, reverse_order, resize_images_to_first, parent_directory, sort):
         images_from_movie, fps, audio, frame_count = self.extract_images_from_movie(movie_path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n)
         if not images_from_movie:
             raise ValueError(f"No images extracted from movie file: {path}")
 
+        # Sort images using visual path if specified
+        if sort == "visual_path":
+            filenames = [f"frame_{i}" for i in range(len(images_from_movie))]
+            sorted_filenames = sort_visual_path(images_from_movie, filenames)
+            images_from_movie = [images_from_movie[filenames.index(name)] for name in sorted_filenames]
+         # Randomly shuffle images if specified
+        elif sort == "random":
+            random.shuffle(images_from_movie)
         if reverse_order:
             images_from_movie.reverse()
 
@@ -339,12 +467,13 @@ class LoadMedia:
             raise ValueError(errmsg)
 
         images = torch.cat(images, dim=0)
-        return (images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, fps, audio, metadata_list)
-    def load_images_from_archive(self, path, image_load_cap, start_index, resize_images_to_first, seed, sort, reverse_order, skip_n, parent_directory):
+        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, fps, audio, metadata_list)
+
+    def load_images_from_archive(self, path, image_load_cap, start_index, resize_images_to_first, seed, sort, reverse_order, skip_n, parent_directory, loop_first_frame):
         supported_image_formats = ('.png', '.jpg', '.jpeg', '.gif', '.tga', '.tiff', '.webp')
         supported_video_formats = ('.mp4', '.mov')
         valid_extensions = supported_image_formats + supported_video_formats
-        images, masks, file_path_list, file_name_list, file_name_list, metadata_list, prompts = [], [], [], [], []
+        images, masks, file_path_list, file_name_list, metadata_list, prompts = [], [], [], [], [], []
         first_image_size = None
 
         if path.lower().endswith('.zip'):
@@ -357,6 +486,11 @@ class LoadMedia:
             with tarfile.open(path, 'r') as t:
                 file_names = [f for f in t.getnames() if f.lower().endswith(valid_extensions)]
 
+        # Determine width and height for target_n_pixels
+        width, height = 1920, 1200  # Example default values; replace with actual logic to determine these
+        target_n_pixels = width * height
+
+        # Sorting logic
         if sort == "alphabetical":
             file_names.sort(key=lambda x: x.lower())
         elif sort == "date_created":
@@ -366,7 +500,10 @@ class LoadMedia:
         elif sort == "random":
             random.seed(seed)
             random.shuffle(file_names)
-
+        elif sort == "visual_path":
+            # Call the main function from sort_visual_path.py
+            file_names = sort_visual_path_main(parent_directory, target_n_pixels=target_n_pixels, list_only=False)
+        print(f"!!!! {file_names}")
         if reverse_order:
             file_names.reverse()
 
@@ -379,10 +516,13 @@ class LoadMedia:
         if image_load_cap > 0:
             file_names = file_names[:image_load_cap]
 
+        # Check if the first file is a movie
+        if file_names and file_names[0].lower().endswith(supported_video_formats):
+            print(f"!!! {file_names[0]}")
+            return self.load_images_from_movie(path=os.path.join(parent_directory, file_names[0]), image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+
         for file_name in file_names:
-            if file_name.lower().endswith(supported_video_formats):
-                return self.load_images_from_movie(path=file_name, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
-            elif file_name.lower().endswith(supported_image_formats):
+            if file_name.lower().endswith(supported_image_formats):
                 if path.lower().endswith('.zip'):
                     with zipfile.ZipFile(path, 'r') as z:
                         with z.open(file_name) as f:
@@ -409,6 +549,15 @@ class LoadMedia:
                     metadata_list.append(metadata)
                     prompts.append(self.extract_positive_prompt(metadata))
 
+        # Append the first frame to the end if loop_first_frame is True
+        if loop_first_frame and images:
+            images.append(images[0])
+            masks.append(masks[0])
+            file_path_list.append(file_path_list[0])
+            file_name_list.append(file_name_list[0])
+            metadata_list.append(metadata_list[0])
+            prompts.append(prompts[0])
+
         if not images:
             errmsg = f"No valid images found in archive '{path}'!"
             logger.error(errmsg)
@@ -416,12 +565,12 @@ class LoadMedia:
 
         images = [self.pil2tensor(img) for img in images]
         width, height = first_image_size
+        frame_count = len(images)
         if len(images) == 1:
             image = images[0]
-            return (image, masks[0], width, height, 1, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, metadata_list[0])
+            return (image, masks[0], width, height, frame_count, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, metadata_list[0])
         images = torch.cat(images, dim=0)
-        return (images, masks, width, height, len(images), file_name_list, file_path_list, parent_directory, 1.0, None, metadata_list)
-
+        return (images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, 1.0, None, metadata_list)
 
     def extract_images_from_movie(self, movie_path, image_load_cap, start_index, skip_n):
     #    Check if ffmpeg is available in the system's PATH
@@ -512,6 +661,9 @@ class LoadMedia:
                 break
             if skip_n > 0:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + skip_n)
+                frame_count = len(images)
+            else:
+                frame_count = len(images)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             images.append(Image.fromarray(frame))
 
@@ -550,20 +702,7 @@ class LoadMedia:
     def extract_positive_prompt(self, metadata):
         return metadata.get("prompt", "")
 
-    def create_persistent_temp_dir(self, name):
-        temp_dir = os.path.join(tempfile.gettempdir(), name)
-        os.makedirs(temp_dir, exist_ok=True)
-        return temp_dir
 
-    def get_local_file_path(self, url):
-        return os.path.join(tempfile.gettempdir(), hashlib.sha256(url.encode()).hexdigest())
-
-    def download_file(self, url, local_filename):
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(local_filename, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
 
 
 class LazyAudioMap:

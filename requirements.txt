@@ -1,3 +1,10 @@
 opencv-python
 piexif
 py7zr
+lpips
+tsp_solver2
+einops
+torch
+torchvision
+tqdm
+
