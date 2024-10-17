@@ -295,17 +295,21 @@ class LoadMedia:
         else:
             i = Image.open(image_path)
 
-        if i.format == 'GIF' and getattr(i, "is_animated", False):
+        # Handle GIFs as movies
+        if i.format == 'GIF' and getattr(i, "is_animated", True):
             frames = []
             for frame in ImageSequence.Iterator(i):
                 frame = frame.convert("RGB")
                 frames.append(frame)
             if start_index >= len(frames):
                 start_index = start_index % len(frames)
-            i = frames[start_index]
-        else:
-            i = ImageOps.exif_transpose(i)
-
+            images = [self.pil2tensor(frame) for frame in frames]
+            width, height = frames[0].size
+            frame_count = len(images)
+            images = torch.cat(images, dim=0)
+            file_name = os.path.basename(image_path).rsplit('.', 1)[0]
+            return (images, torch.zeros((frame_count, 64, 64), dtype=torch.float32), width, height, frame_count, file_name, image_path, parent_directory, 1.0, None, "", {})                  
+        i = ImageOps.exif_transpose(i)
         prompt, negative, width, height = "", "", i.width, i.height
         metadata = self.build_metadata(image_path, i)
         prompt = self.extract_positive_prompt(metadata)
