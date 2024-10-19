@@ -136,9 +136,12 @@ def get_uniformly_sized_crops(img_paths, target_n_pixels):
 
 def load_images(directory, target_size):
     images, image_paths = [], []
+    valid_extensions = ('.png', '.jpg', '.jpeg')  # Define valid image extensions
     for filename in os.listdir(directory):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        if filename.lower().endswith(valid_extensions):
             image_paths.append(os.path.join(directory, filename))
+        else:
+            print(f"Ignoring non-image file: {filename}")
     
     print("Loading and cropping all images to a uniform size...")
     images = get_uniformly_sized_crops(image_paths, target_size)

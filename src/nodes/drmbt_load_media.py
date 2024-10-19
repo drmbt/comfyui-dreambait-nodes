@@ -205,9 +205,14 @@ class LoadMedia:
         else:
             parent_directory = os.path.dirname(path)
 
+        # Define legal extensions
+        legal_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z']
+
         # Handle directories
         if os.path.isdir(path):
             dir_files = os.listdir(path)
+            # Filter files to only include those with legal extensions
+            dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in legal_extensions)]
             frame_count = len([f for f in dir_files if os.path.isfile(os.path.join(path, f))])
         # Handle video files
         elif path.lower().endswith(('.mp4', '.mov')):
@@ -295,17 +300,21 @@ class LoadMedia:
         else:
             i = Image.open(image_path)
 
-        if i.format == 'GIF' and getattr(i, "is_animated", False):
+        # Handle GIFs as movies
+        if i.format == 'GIF' and getattr(i, "is_animated", True):
             frames = []
             for frame in ImageSequence.Iterator(i):
                 frame = frame.convert("RGB")
                 frames.append(frame)
             if start_index >= len(frames):
                 start_index = start_index % len(frames)
-            i = frames[start_index]
-        else:
-            i = ImageOps.exif_transpose(i)
-
+            images = [self.pil2tensor(frame) for frame in frames]
+            width, height = frames[0].size
+            frame_count = len(images)
+            images = torch.cat(images, dim=0)
+            file_name = os.path.basename(image_path).rsplit('.', 1)[0]
+            return (images, torch.zeros((frame_count, 64, 64), dtype=torch.float32), width, height, frame_count, file_name, image_path, parent_directory, 1.0, None, "", {})                  
+        i = ImageOps.exif_transpose(i)
         prompt, negative, width, height = "", "", i.width, i.height
         metadata = self.build_metadata(image_path, i)
         prompt = self.extract_positive_prompt(metadata)
@@ -330,8 +339,19 @@ class LoadMedia:
         if len(dir_files) == 0:
             raise FileNotFoundError(f"No files in directory '{path}'.")
 
-        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp','.mp4', '.mov']
-        dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in valid_extensions)]
+        # Define legal extensions
+        legal_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z']
+        
+        # Filter files to only include those with legal extensions
+        dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in legal_extensions)]
+        
+        if len(dir_files) == 0:
+            raise FileNotFoundError(f"No valid files in directory '{path}'.")
+
+        # Ensure the first file is checked after filtering
+        first_file = dir_files[0]
+        if not any(first_file.lower().endswith(ext) for ext in legal_extensions):
+            raise ValueError(f"First file '{first_file}' does not have a legal extension.")
         
         # Check if the first file is a movie
         if dir_files and dir_files[0].lower().endswith(('.mp4', '.mov')):
@@ -370,18 +390,19 @@ class LoadMedia:
         elif sort == "visual_path":
             # Call the main function from sort_visual_path.py
             dir_files = sort_visual_path_main(path, target_n_pixels=target_n_pixels, list_only=False)
-            print(f"!!!! 367  {dir_files}")
+            #print(f"!!!! 367  {dir_files}")
         
         if reverse_order:
             dir_files.reverse()
-        print(f"!!! 371 {dir_files}")
-        dir_files = [os.path.normpath(os.path.join(path, x)).replace("\\", "/") for x in dir_files][start_index:]
-        print(f"!!!! 373  {dir_files}")
+        
+        # Apply start_index only once
+        dir_files = [os.path.normpath(os.path.join(path, x)).replace("\\", "/") for x in dir_files]
+        
         if skip_n > 0:
             dir_files = dir_files[start_index::skip_n + 1]
         else:
             dir_files = dir_files[start_index:]
-
+        
         if image_load_cap > 0:
             dir_files = dir_files[:image_load_cap]
 
@@ -404,7 +425,7 @@ class LoadMedia:
                 metadata_list.append(metadata)
                 prompts.append(self.extract_positive_prompt(metadata))
            
-        print(f"!!!! 375  file_name_list: {file_name_list}")
+        #print(f"!!!! 375  file_name_list: {file_name_list}")
         # Append the first frame to the end if loop_first_frame is True
         if loop_first_frame and images:
             images.append(images[0])
@@ -503,11 +524,10 @@ class LoadMedia:
         elif sort == "visual_path":
             # Call the main function from sort_visual_path.py
             file_names = sort_visual_path_main(parent_directory, target_n_pixels=target_n_pixels, list_only=False)
-        print(f"!!!! {file_names}")
+        #print(f"!!!! {file_names}")
         if reverse_order:
             file_names.reverse()
 
-        file_names = file_names[start_index:]
         if skip_n > 0:
             file_names = file_names[start_index::skip_n + 1]
         else:
@@ -518,7 +538,7 @@ class LoadMedia:
 
         # Check if the first file is a movie
         if file_names and file_names[0].lower().endswith(supported_video_formats):
-            print(f"!!! {file_names[0]}")
+            #print(f"!!! {file_names[0]}")
             return self.load_images_from_movie(path=os.path.join(parent_directory, file_names[0]), image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
 
         for file_name in file_names:
