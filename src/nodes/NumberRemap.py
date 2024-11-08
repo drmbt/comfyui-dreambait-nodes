@@ -92,7 +92,7 @@ class NumberRemap:
     CATEGORY = "DRMBT nodes"
     
     @classmethod
-    def IS_CHANGED(self, number, pre_multiply, override_number):
+    def IS_CHANGED(self, number=0.0, pre_multiply=1.000, override_number=None, from_range_min=0.0, from_range_max=1.0, to_range_min=0.0, to_range_max=1.0, clamp_min=None, clamp_max=None):
         m = hashlib.sha256()
         dummy = str(float(pre_multiply))
         m.update(dummy.encode("utf-8"))
@@ -100,7 +100,7 @@ class NumberRemap:
 
     def number_operation(self, number=0.0, pre_multiply=1.000, override_number=None, from_range_min=0.0, from_range_max=1.0, to_range_min=0.0, to_range_max=1.0, clamp_min=None, clamp_max=None):
         if override_number or pre_multiply is not None:
-            change_dict = self.IS_CHANGED(number, pre_multiply, override_number)
+            change_dict = self.IS_CHANGED(number, pre_multiply, override_number, from_range_min, from_range_max, to_range_min, to_range_max)
             override = change_dict['override_number']
             mult = float(change_dict['pre_multiply'])
             if override is not None:
