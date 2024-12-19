@@ -8,6 +8,7 @@ from .nodes.NumberRemap import NumberRemap
 from .nodes.BoolPlusPlus import BoolPlusPlus
 from .nodes.SwitchDuo import SwitchDuo
 from .nodes.ListItemSelector import ListItemSelector
+from .nodes.ImageFrameBlend import ImageFrameBlend
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -19,7 +20,8 @@ NODE_CLASS_MAPPINGS = {
     "NumberRemap": NumberRemap,
     "BoolPlusPlus": BoolPlusPlus,
     "SwitchDuo": SwitchDuo,
-    "ListItemSelector": ListItemSelector
+    "ListItemSelector": ListItemSelector,
+    "ImageFrameBlend": ImageFrameBlend
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -32,5 +34,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NumberRemap": "Number Remap Range",
     "BoolPlusPlus": "BOOL ++",
     "SwitchDuo": "Switch Duo",
-    "ListItemSelector": "List Item Selector"
+    "ListItemSelector": "List Item Selector",
+    "ImageFrameBlend": "Frame Blend"
 }

@@ -1,7 +1,6 @@
 from .utils import any_typ
 
 class DRMBT_MultiMinMax:
-    ### forked from impact pack###
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -21,9 +20,10 @@ class DRMBT_MultiMinMax:
         }
 
     FUNCTION = "doit"
-
     CATEGORY = "Math"
-
+    DESCRIPTION = """A node that finds the minimum or maximum value among multiple inputs.
+    Forked from Impact Pack's MinMax node, extended to support up to 8 inputs.
+    Accepts any comparable type and returns the min/max value of the same type."""
     RETURN_TYPES = (any_typ, )
 
     def doit(self, mode, a, b, **optional):

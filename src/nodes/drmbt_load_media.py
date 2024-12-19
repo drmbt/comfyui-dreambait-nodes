@@ -14,7 +14,7 @@ import numpy as np
 import requests
 from io import BytesIO
 import tempfile
-import shutil
+import shutil 
 import cv2
 from pathlib import Path
 from PIL.ExifTags import TAGS, GPSTAGS, IFD
@@ -124,45 +124,62 @@ def sort_visual_path(images, filenames):
     sorted_filenames = [filenames[i] for i in col_ind]
     return sorted_filenames
 
-def run_sort_visual_path(directory):
-    # Run the sort_visual_path.py script and capture its output
-    result = subprocess.run(
-        [sys.executable, "sort_visual_path.py", "--directory", directory, "--list_only"],
-        capture_output=True,
-        text=True
-    )
-    if result.returncode != 0:
-        logger.error(f"Error running sort_visual_path.py: {result.stderr}")
-        raise RuntimeError("Failed to sort visual path")
-    # Parse the output into a list of file paths
-    sorted_paths = resul
-
 class LoadMedia:
-    """
-    Loads media from a specified path, which can be an image path or directory of images, a video file, zip archive or a URL.
-    It supports extracting frames from video files and treating them as image sequences.
-
-    TODO:
-    - METADATA and PROMPT extraction aren't working properly for images loaded from a directory or zip archive.
-    - get FPS output
-    - get
-    """
 
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "path": ("STRING", {"image_upload": True}),
-                "resize_images_to_first": ("BOOLEAN", {"default": True}),
-                "image_load_cap": ("INT", {"default": 0, "min": 0, "step": 1}),
-                "start_index": ("INT", {"default": 0, "min": 0, "step": 1}),
-                "start_index_use_seed": ("BOOLEAN", {"default": False, "tooltip": "Use seed as the start_index value."}),
-                "seed": ("INT",{"default": 0}),
-                "error_after_last_frame": ("BOOLEAN", {"default": False, "tooltip": "Raise an exception if start_index > COUNT, otherwise use start_index % COUNT."}),
-                "skip_n": ("INT", {"default": 0, "min": 0, "step": 1, "tooltip": "Number of images to skip. 0 means no skipping."}),
-                "sort": (["None", "alphabetical", "date_created", "date_modified", "visual_path", "random"], {"default": "None", "tooltip": "sort method for multi image inputs"}),
-                "reverse_order": ("BOOLEAN", {"default": False}),
-                "loop_first_frame": ("BOOLEAN", {"default": False, "tooltip": "Repeat the first frame as the last frame."})
+                "path": ("STRING", {
+                    "image_upload": True,
+                    "tooltip": "Path to media file(s). Can be an image, directory of images, video file, zip/tar archive, or URL."
+                }),
+                "resize_images_to_first": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Resize all images to match the dimensions of the first image in the sequence."
+                }),
+                "image_load_cap": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "step": 1,
+                    "tooltip": "Maximum number of images to load. 0 means load all images."
+                }),
+                "start_index": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "step": 1,
+                    "tooltip": "Index of the first image to load from the sequence."
+                }),
+                "start_index_use_seed": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Use the seed value as the start_index for random or sequential operations."
+                }),
+                "seed": ("INT", {
+                    "default": 0,
+                    "tooltip": "Seed value for random operations and optionally start_index if start_index_use_seed is enabled."
+                }),
+                "error_after_last_frame": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "If True, raise an error when start_index exceeds frame count. If False, wrap around using modulo."
+                }),
+                "skip_n": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "step": 1,
+                    "tooltip": "Skip N frames between each loaded frame. 0 means load consecutive frames."
+                }),
+                "sort": (["None", "alphabetical", "date_created", "date_modified", "visual_path", "random"], {
+                    "default": "None",
+                    "tooltip": "Method to sort multiple images: None, alphabetical, by date, visual similarity, or random."
+                }),
+                "reverse_order": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Reverse the order of loaded images after sorting."
+                }),
+                "loop_first_frame": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Append the first frame to the end of the sequence to create seamless loops."
+                })
             }
         }
 
@@ -171,20 +188,13 @@ class LoadMedia:
     RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT", "INT", "STRING", "STRING", "STRING", "FLOAT", "AUDIO", "STRING", "METADATA_RAW")
     RETURN_NAMES = ("image", "mask", "WIDTH", "HEIGHT", "COUNT", "FILE_NAME", "FILE_PATH", "PARENT_DIRECTORY", "FPS", "AUDIO", "PROMPT", "METADATA_RAW")
     FUNCTION = "load_media"
+    DESCRIPTION = """Loads media from various sources with advanced options for sequence handling.
 
-    # @classmethod
-    # def IS_CHANGED(cls, path, resize_images_to_first, image_load_cap, start_index, start_index_use_seed, sort, seed, reverse_order):
-    #     path = str(path).replace('"', "")
-    #     if not path.startswith(("http://", "https://")):
-    #         path = os.path.normpath(path).replace("\\", "/")
-    #     m = hashlib.sha256()
-    #     if not path.startswith(("http://", "https://")):
-    #         with open(path, 'rb') as f:
-    #             m.update(f.read())
-    #         return m.digest().hex()
-    #     else:
-    #         m.update(path.encode("utf-8"))
-    #         return m.digest().hex()
+Key Features:
+- Supports images, directories, videos, archives (zip/tar/7z), and URLs
+- Smart sorting options including visual similarity-based ordering
+- Seamless loop creation with loop_first_frame
+"""
         
     def load_media(self, path, seed, image_load_cap, start_index, start_index_use_seed, error_after_last_frame, skip_n, resize_images_to_first, sort, reverse_order, loop_first_frame):
         if start_index_use_seed:
@@ -327,7 +337,7 @@ class LoadMedia:
             mask = 1. - torch.from_numpy(np.array(i.getchannel('A')).astype(np.float32) / 255.0)
         
         file_name = os.path.basename(image_path).rsplit('.', 1)[0]
-        return (image, mask, width, height, 1, file_name, image_path, parent_directory, 1.0, None, metadata)
+        return (image, mask, width, height, 1, file_name, image_path, parent_directory, 1.0, None, prompt, metadata)
 
     def load_images_from_folder(self, path, image_load_cap, start_index, skip_n, resize_images_to_first, seed, sort, reverse_order, parent_directory, loop_first_frame):
         # Strip quotes from the path if present
@@ -625,43 +635,7 @@ class LoadMedia:
             frame_count = 0
             fps = 30.0  # Default FPS
 
-        # if frame_count == 0:
-            # Fallback method to get frame count and fps
-        #     args = [ffmpeg_path, "-i", movie_path]
-        #     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #     stderr = process.communicate()[1].decode('utf-8')
-        #     for line in stderr.split('\n'):
-        #         if 'Duration' in line:
-        #             duration = line.split('Duration: ')[1].split(',')[0]
-        #             hours, minutes, seconds = map(float, duration.split(':'))
-        #             total_seconds = hours * 3600 + minutes * 60 + seconds
-        #         if 'Stream' in line and 'Video' in line:
-        #             fps = float(Fraction(line.split('fps,')[0].split()[-1]))
-        #     frame_count = int(total_seconds * fps)
-        #     print(f"!!!!! frame_count (fallback): {frame_count}")
-        #     print(f"!!!!! fps (fallback): {fps}")
 
-        # # Adjust start_index and skip_n
-        # start_frame = start_index
-        # if skip_n > 0:
-        #     start_frame = start_index * (skip_n + 1)
-
-        # args = [ffmpeg_path, "-i", movie_path, "-vf", f"select='not(mod(n\\,{skip_n+1}))'", "-vsync", "vfr", "-q:v", "2", "-f", "image2pipe", "-vcodec", "png", "-"]
-        # process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # images = []
-        # while True:
-        #     data = process.stdout.read(1024 * 1024)  # Read in larger chunks
-        #     if not data:
-        #         break
-        #     try:
-        #         img = Image.open(BytesIO(data))
-        #         images.append(img)
-        #         if image_load_cap > 0 and len(images) >= image_load_cap:
-        #             break
-        #     except Image.UnidentifiedImageError:
-        #         continue  # Skip any data that cannot be identified as an image
-        # process.stdout.close()
-        # process.wait()
         cap = cv2.VideoCapture(movie_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video file: {movie_path}")

@@ -35,6 +35,9 @@ class ListItemSelector:
     OUTPUT_NODE = True
     FUNCTION = "select_items"
     CATEGORY = "DRMBT nodes"
+    DESCRIPTION = """A node that selects items from a list based on indices or patterns.
+    Supports slicing, wildcards, and single indices (including negative).
+    Returns the selected items as a tuple of any type, string, and length."""
 
     def select_items(self, list_input=None, item_indices="", debug=True):
         def debug_print(*args, **kwargs):

@@ -62,48 +62,36 @@ class BoolPlusPlus:
     OUTPUT_NODE = True
     FUNCTION = "boolean_operation"
     CATEGORY = "DRMBT nodes"
-    @classmethod
-    def IS_CHANGED(self, value=False, on_false="0.0", on_true="1.0", override_bool= None, override_on_false= None, override_on_true= None):
-        m = hashlib.sha256()
-        dummy = "dummy"
-        m.update(dummy.encode("utf-8"))
-        return {"override_bool": override_bool, "override_on_false":override_on_false, "override_on_true": override_on_true,  "dummy": m.digest().hex()}
-    
-    def boolean_operation(self, value=False, on_false="0.0", on_true="1.0", override_bool= None, override_on_false= None, override_on_true= None):
-        boolean = value 
+    DESCRIPTION = """
+    Returns a boolean value based on the input value and optional overrides, as well as type conversions and boolean conditional outputs.
+    """
+    def boolean_operation(self, value=False, on_false="0.0", on_true="1.0", override_bool=None, override_on_false=None, override_on_true=None):
+        boolean = value
         
-        if override_bool is not None or override_on_false is not None or override_on_true is not None:
-            change_dict = self.IS_CHANGED(value, on_false, on_true, override_bool, override_on_false, override_on_true)
-            
-            if change_dict['override_bool'] is not None:
-
-                if isinstance(change_dict['override_bool'], str):
-                    if change_dict['override_bool'] in ["False", "false", "0", "0.0", ""]:
-                        boolean = False
-                    else: 
-                        try:
-                            boolean = bool(change_dict['override_bool'])
-                        except:
-                            try:
-                                boolean = bool(float(change_dict['override_bool']))
-                            except:
-                                boolean = True
+        if override_bool is not None:
+            if isinstance(override_bool, str):
+                if override_bool in ["False", "false", "0", "0.0", ""]:
+                    boolean = False
                 else:
                     try:
-                        boolean = bool(change_dict['override_bool'])
+                        boolean = bool(override_bool)
                     except:
-                        boolean = value
-                
-            if change_dict['override_on_false'] is not None:
+                        try:
+                            boolean = bool(float(override_bool))
+                        except:
+                            boolean = True
+            else:
                 try:
-                    on_false = change_dict['override_on_false']
+                    boolean = bool(override_bool)
                 except:
-                    pass
-            if change_dict['override_on_true'] is not None:
-                try:
-                    on_true = change_dict['override_on_true']
-                except:
-                    pass
+                    boolean = value
+
+        if override_on_false is not None:
+            on_false = override_on_false
+            
+        if override_on_true is not None:
+            on_true = override_on_true
+
         output_any = boolean
         output_bool = boolean
         if override_bool is not None and isinstance(override_bool, (bool, int, float)):
@@ -113,7 +101,11 @@ class BoolPlusPlus:
                 boolean = False
             else:
                 boolean = True
+
+        output_bool = boolean
+                
         if boolean is False:
+            output_bool = False  # Ensure bool output is always False when boolean is False
             if isinstance(on_false, (bool, int, float)):
                 output_int = int(on_false)
                 output_any = bool(on_false)
@@ -124,22 +116,13 @@ class BoolPlusPlus:
                     output_float = float(output_int)
                     output_string = str(bool(output_int))
             elif isinstance(on_false, str):
-                if on_false in ["False", "false", "0", "0.0", ""]:
-                    output_bool = False
-                    output_int = 0
-                    output_float = 0.0
-                    output_string = str(output_bool)
-                else:
-                    output_bool = True
-                    try: 
-                        output_float = int(on_false) 
-                    except: 
-                        output_float = 1.0
-                    output_int = int(output_float)
-                    output_string = str(on_false)
-            else:
-                output_int = int(output_bool)
+                # Keep output_bool as False, but process other outputs normally
+                output_int = 0 if on_false in ["False", "false", "0", "0.0", ""] else 1
                 output_float = float(output_int)
+                output_string = str(on_false)
+            else:
+                output_int = 0  # Default to 0 for unsupported types
+                output_float = 0.0
                 output_string = str(output_bool)
                 output_any = on_false
         elif boolean is True:

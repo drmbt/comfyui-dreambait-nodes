@@ -1,37 +1,60 @@
----
-updated: 2024-08-22T00:08:10+02:00
----
 
 ## comfyui-dreambait-nodes
 
-A collection of forks, QoL nodes and utilities for ComfyUI
+A collection of forks, QoL nodes, and utilities for ComfyUI.
 
-### Aspect Pad Image For Outpainting
+### Nodes Overview
 
-A node to calculate args for default comfy node 'Pad Image For Outpainting' based on justifying and expanding to common SDXL and SD1.5 aspect ratios
+#### Aspect Pad Image For Outpainting
+
+A node to calculate arguments for the default ComfyUI node 'Pad Image For Outpainting' based on justifying and expanding to common SDXL and SD1.5 aspect ratios.
 
 ![](/examples/aspect_pad_for_outpainting.png)
 
-### Load Media
+#### Load Media
 
-LoadMedia class for loading images, and videos as image sequences.
+**Category:** Image
 
-    This class provides functionality to load images from a file path, which can be a single image,
-    a directory of images, or a video file (.mp4, .mov). It supports extracting frames from video files
-    and treating them as image sequences.
+Loads media from various sources with advanced options for sequence handling.
 
-    Disclaimer:
-    There is a known issue with resizing mismatched resolution images. If using a path to a directory,
-    make sure all images are the same size to avoid potential issues.
+- Supports images, directories, videos, archives (zip/tar/7z), and URLs.
+- Smart sorting options including visual similarity-based ordering.
+- Seamless loop creation with `loop_first_frame`.
 
-    TO-DO:
-    - properly handle mismatched tensor sizes in dir with different resolution assets
-    - fork in [Crystools](https://github.com/crystian/ComfyUI-Crystools) style metadata extractor
-    
-### Multi Min/Max
 
-a fork of [Impact-Pack MinMax](https://github.com/ltdrdata/ComfyUI-Impact-Pack) that can accept up to 8 values
+#### Multi Min/Max
 
-### String Item Menu
+A node that finds the minimum or maximum value among multiple inputs. Forked from Impact Pack's MinMax node, extended to support up to 8 inputs. Accepts any comparable type and returns the min/max value of the same type.
 
-a context selector that extracts an item's index from a list of delimiter separated strings
+#### String Item Menu
+
+A context selector that extracts an item's index from a list of delimiter-separated strings.
+
+#### TextPlusPlus
+
+Combines text with optional prepend, append, and override operations.
+
+#### NumberPlusPlus
+
+
+A node to perform arithmetic operations on a number, including pre-addition, multiplication, and post-addition. It also provides formatted string outputs for the number, its integer representation, and a boolean indicating if the number is greater than 0.
+
+#### NumberRemap
+
+A node to remap a number from one range to another.
+
+#### BoolPlusPlus
+
+A node to handle boolean operations with additional features.
+
+#### SwitchDuo
+
+A node that switches between two outputs based on a boolean value. Supports overriding the boolean value with an optional input.
+
+#### ListItemSelector
+
+A node to select an item from a list based on a given index.
+
+#### ImageFrameBlend
+
+A node to blend frames of an image sequence.

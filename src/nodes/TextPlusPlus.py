@@ -1,4 +1,8 @@
 class TextPlusPlus:
+    """A node for text manipulation with prepend/append functionality"""
+    
+    DESCRIPTION = """Combines text with optional prepend, append and override operations."""
+
     def __init__(self):
         pass
 
@@ -59,6 +63,11 @@ class TextPlusPlus:
     OUTPUT_NODE = True
     FUNCTION = "text_assemble"
     CATEGORY = "DRMBT nodes"
+
+    @classmethod
+    def IS_CHANGED(cls, prepend, body, override_body, append, delimiter):
+        # All text inputs and the delimiter can affect the output
+        return (prepend, body, override_body, append, delimiter)
 
     def text_assemble(self, prepend="", body="", override_body=None, append="", delimiter=" "):
         if override_body is not None:

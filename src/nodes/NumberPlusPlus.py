@@ -67,7 +67,7 @@ class NumberPlusPlus:
     OUTPUT_NODE = True
     FUNCTION = "number_operation"
     CATEGORY = "DRMBT nodes"
-    
+    DESCRIPTION = "A node to perform arithmetic operations on a number, including pre-addition, multiplication, and post-addition. It also provides formatted string outputs for the number, its integer representation, and a boolean indicating if the number is greater than 0."
     def number_operation(self, number=0.0, integer="round", pre_add=0.0, multiplier=1.0, post_add=0.0, override_number=None, unique_id=None, extra_pnginfo=None, display_number="0.00"):
         number = float(number)
         if override_number is not None:

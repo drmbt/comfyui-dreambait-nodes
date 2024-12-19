@@ -30,7 +30,8 @@ class SwitchDuo:
     RETURN_NAMES = ("OUTPUT1", "OUTPUT2")
     FUNCTION = "switch"
     CATEGORY = "DRMBT nodes"
-
+    DESCRIPTION = """A node that switches between two outputs based on a boolean value.
+    Supports overriding the boolean value with an optional input."""
     def switch(self, value=False, on_false1=None, on_true1=None, override_switch=None, on_false2=None, on_true2=None):
         if override_switch is not None:
             if isinstance(override_switch, str):
