@@ -9,6 +9,7 @@ from .nodes.BoolPlusPlus import BoolPlusPlus
 from .nodes.SwitchDuo import SwitchDuo
 from .nodes.ListItemSelector import ListItemSelector
 from .nodes.ImageFrameBlend import ImageFrameBlend
+from .nodes.TextLineSelect import TextLineSelect
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -21,7 +22,8 @@ NODE_CLASS_MAPPINGS = {
     "BoolPlusPlus": BoolPlusPlus,
     "SwitchDuo": SwitchDuo,
     "ListItemSelector": ListItemSelector,
-    "ImageFrameBlend": ImageFrameBlend
+    "ImageFrameBlend": ImageFrameBlend,
+    "TextLineSelect": TextLineSelect
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -35,5 +37,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "BoolPlusPlus": "BOOL ++",
     "SwitchDuo": "Switch Duo",
     "ListItemSelector": "List Item Selector",
-    "ImageFrameBlend": "Frame Blend"
+    "ImageFrameBlend": "Frame Blend",
+    "TextLineSelect": "Text Line Select"
 }
