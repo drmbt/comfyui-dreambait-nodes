@@ -94,33 +94,9 @@ class NumberRemap:
     Supports optional clamping, overriding the number, and pre-multiplying the number."""
     
     @classmethod
-    def IS_CHANGED(cls, number=0.0, pre_multiply=1.000, override_number=None, from_range_min=0.0, from_range_max=1.0, to_range_min=0.0, to_range_max=1.0, clamp_min=None, clamp_max=None):
-        # If override_number is set, only use that and ignore the main number
-        main_value = str(override_number) if override_number is not None else str(round(float(number) * float(pre_multiply), 6))
-        
-        # Round the range values to reduce unnecessary updates
-        ranges = [
-            round(float(from_range_min), 6),
-            round(float(from_range_max), 6),
-            round(float(to_range_min), 6),
-            round(float(to_range_max), 6)
-        ]
-        
-        # Only include clamp values if they're set
-        clamps = []
-        if clamp_min is not None:
-            clamps.append(round(float(clamp_min), 6))
-        if clamp_max is not None:
-            clamps.append(round(float(clamp_max), 6))
-            
-        # Combine all relevant values
-        values = [main_value] + [str(x) for x in ranges] + [str(x) for x in clamps]
-        combined = "_".join(values)
-        
-        # Create a hash of the inputs that matter
-        m = hashlib.sha256()
-        m.update(combined.encode('utf-8'))
-        return m.digest().hex()
+    def IS_CHANGED(cls, value, old_min, old_max, new_min, new_max):
+        # Use default ComfyUI behavior for input change detection
+        return hash((value, old_min, old_max, new_min, new_max))
 
     def number_operation(self, number=0.0, pre_multiply=1.000, override_number=None, from_range_min=0.0, from_range_max=1.0, to_range_min=0.0, to_range_max=1.0, clamp_min=None, clamp_max=None):
         if override_number is not None:

@@ -111,6 +111,10 @@ class ImageFrameBlend:
     def execute(self, image, target_frames, blend_strength, method="linear", loop_seamless=False, use_rife=True):
         orig_size = image.shape[0]
 
+        # Special handling for single image input - immediately return repeated image
+        if orig_size == 1:
+            return (image.repeat(target_frames, 1, 1, 1),)
+
         if orig_size == target_frames:
             return (image,)
 

@@ -13,8 +13,6 @@ A node to calculate arguments for the default ComfyUI node 'Pad Image For Outpai
 
 #### Load Media
 
-**Category:** Image
-
 Loads media from various sources with advanced options for sequence handling.
 
 - Supports images, directories, videos, archives (zip/tar/7z), and URLs.
