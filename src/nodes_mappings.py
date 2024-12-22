@@ -12,6 +12,7 @@ from .nodes.ImageFrameBlend import ImageFrameBlend
 from .nodes.TextLineSelect import TextLineSelect
 from .nodes.TextLinesToList import TextLinesToList
 from .nodes.ListItemExtract import ListItemExtract
+from .nodes.drmbt_image_resize import ImageResizeFaceAware
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -27,7 +28,8 @@ NODE_CLASS_MAPPINGS = {
     "ImageFrameBlend": ImageFrameBlend,
     "TextLineSelect": TextLineSelect,
     "TextLinesToList": TextLinesToList,
-    "ListItemExtract": ListItemExtract
+    "ListItemExtract": ListItemExtract,
+    "ImageResizeFaceAware": ImageResizeFaceAware
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -43,5 +45,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ListItemSelector": "List Item Selector",
     "ImageFrameBlend": "Frame Blend",
     "TextLineSelect": "Text Line Select",
-    "TextLinesToList": "Text Lines To List"
+    "TextLinesToList": "Text Lines To List",
+    "ImageResizeFaceAware": "Image Resize Face Aware"
 }

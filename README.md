@@ -1,4 +1,3 @@
-
 ## comfyui-dreambait-nodes
 
 A collection of forks, QoL nodes, and utilities for ComfyUI.
@@ -56,3 +55,26 @@ A node to select an item from a list based on a given index.
 #### ImageFrameBlend
 
 A node to blend frames of an image sequence.
+
+#### Image Resize Face Aware
+
+A fork of ComfyUI_essentials' Image Resize node with added face detection capabilities:
+- All original resize methods (stretch, keep proportion, fill/crop, pad)
+- New 'crop to face' method that detects faces, crops to them, and resizes
+- New 'crop to face (keep_size)' method that produces a square crop centered on the largest detected face without resizing
+
+Uses OpenCV's DNN face detector for reliable face detection, falling back to center crop if no face is found.
+
+![](/examples/ImageResizeFaceAware.jpg)
+
+#### Text Line Select
+
+A node to select specific lines from a text input based on line numbers, with an optional random toggle.
+
+#### Text Lines To List
+
+Converts multi-line text input into a list, with each line as a separate item.
+
+#### List Item Extract
+
+Extracts a specific item from a list at the given index, with options for handling out-of-range indices.

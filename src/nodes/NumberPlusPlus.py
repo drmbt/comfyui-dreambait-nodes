@@ -11,6 +11,7 @@ class NumberPlusPlus:
                     "FLOAT",
                     {
                         "default": 0.0,
+                        "step": .01,
                         "forceInput": False,
                         "tooltip": "Main number parameter"
                     },
@@ -28,6 +29,7 @@ class NumberPlusPlus:
                     any_typ,
                     {
                         "default": 0.0,
+                        "step": .001,
                         "defaultInput": True,
                         "tooltip": "pre-add any type float int or legal float wrappable string value to number"
                     },
@@ -36,6 +38,7 @@ class NumberPlusPlus:
                     any_typ, 
                     {
                         "default": None,
+                        "step": .001,
                         "defaultInput": True,
                         "tooltip": "override any type float int or legal float wrappable string value to number"
                     },
@@ -44,6 +47,7 @@ class NumberPlusPlus:
                     any_typ,
                     {
                         "default": 1.0,
+                        "step": .001,
                         "defaultInput": True,
                         "tooltip": "multiply the main number"
                     },
@@ -52,6 +56,7 @@ class NumberPlusPlus:
                     "FLOAT",
                     {
                         "default": 0.0,
+                        "step": .001,
                         "defaultInput": True,
                         "tooltip": "add to value after multiplying"
                     },

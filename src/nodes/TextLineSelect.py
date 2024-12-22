@@ -1,5 +1,6 @@
 import sys
 import logging
+import random
 from typing import Optional
 
 # Initialize logger
@@ -20,6 +21,10 @@ class TextLineSelect:
                     "max": sys.maxsize,  # No practical upper limit
                     "step": 1,
                     "tooltip": "Select which line to output (cycles through available lines). This number loops with a modulo operator."
+                }),
+                "random": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "When enabled, selects a random line instead of using the select index"
                 }),     
             },
             "hidden": {},
@@ -33,10 +38,10 @@ class TextLineSelect:
     CATEGORY = "Text Tools"
     DESCRIPTION = "Display text with optional line selection"
     
-    def display_text(self, text: Optional[str], select):
+    def display_text(self, text: Optional[str], select: int, random: bool):
         if text is None:
             logger.error("Received None for text input in display_text.")
-            return ""  # Or handle appropriately
+            return ""
 
         print("==================")
         print("IF_AI_tool_output:")
@@ -54,8 +59,12 @@ class TextLineSelect:
                 "result": (text, [], 0, text)
             }
         
-        # Ensure select is within valid range using modulo
-        select_index = select % count if count > 0 else 0
+        # Select either random or indexed line
+        if random:
+            select_index = random.randint(0, count - 1)
+        else:
+            select_index = select % count if count > 0 else 0
+            
         selected = text_list[select_index]
         
         # Return both UI update and the multiple outputs

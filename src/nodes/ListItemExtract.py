@@ -14,7 +14,7 @@ class ListItemExtract:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "list_input": ("any",),
+                "list_input": ("STRING", {}),
                 "index": ("INT", {
                     "default": 0,
                     "min": 0,
@@ -23,20 +23,13 @@ class ListItemExtract:
             },
         }
 
-    RETURN_TYPES = ("any",)
+    RETURN_TYPES = ("STRING",)
     FUNCTION = "extract_item"
     CATEGORY = "List Operations"
     DESCRIPTION = "Extracts an item from a list at the specified index. Works with text, numbers, and images."
 
     def extract_item(self, list_input: Any, index: int) -> Tuple[Any]:
         try:
-            # Handle tensor batch (multiple images)
-            if isinstance(list_input, torch.Tensor) and len(list_input.shape) == 4:
-                if index >= list_input.shape[0]:
-                    logger.warning(f"Index {index} is out of range. Using last item.")
-                    index = list_input.shape[0] - 1
-                return (list_input[index:index+1],)  # Keep the batch dimension
-
             # If input is a string representation of a list, parse it
             if isinstance(list_input, str):
                 try:
@@ -57,8 +50,12 @@ class ListItemExtract:
             # Extract the item
             result = list_input[index]
             
+            # Convert result to string if it isn't already
+            if not isinstance(result, str):
+                result = str(result)
+            
             return (result,)
 
         except Exception as e:
             logger.error(f"Error extracting item from list: {str(e)}")
-            return (None,) 
+            return ("",) 

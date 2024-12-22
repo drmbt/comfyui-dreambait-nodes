@@ -70,6 +70,9 @@ class TextPlusPlus:
         return (prepend, body, override_body, append, delimiter)
 
     def text_assemble(self, prepend="", body="", override_body=None, append="", delimiter=" "):
+        # Add handling of escape sequences
+        delimiter = bytes(delimiter, "utf-8").decode("unicode_escape")
+        
         if override_body is not None:
             body = override_body
         if prepend != "":
