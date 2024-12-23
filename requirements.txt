@@ -6,4 +6,5 @@ pyloudnorm>=0.1.0
 piexif
 moviepy
 py7zr
+tsp_solver
 
