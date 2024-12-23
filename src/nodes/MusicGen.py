@@ -3,8 +3,12 @@ import torch
 import random
 import numpy as np
 import folder_paths
+import warnings
 from huggingface_hub import snapshot_download
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
+
+# Suppress specific PyTorch warning about attention masks
+warnings.filterwarnings("ignore", message=".*scaled_dot_product_attention.*")
 
 # Register our model type with ComfyUI
 folder_paths.folder_names_and_paths["musicgen"] = ([os.path.join(folder_paths.models_dir, "musicgen")], folder_paths.supported_pt_extensions)
@@ -15,19 +19,10 @@ MUSICGEN_MODELS = {
     "medium": "facebook/musicgen-medium",      # 1.5B parameters, balanced
     "large": "facebook/musicgen-large",        # 3.3B parameters, best quality
     
-    # Specialized models
-    "melody": "facebook/musicgen-melody",      # For melody-conditioned generation
-    "melody-large": "facebook/musicgen-melody-large",  # Higher quality melody model
-    
     # Stereo models (for spatial audio)
     "stereo-small": "facebook/musicgen-stereo-small",  # Basic stereo
     "stereo-medium": "facebook/musicgen-stereo-medium", # Better stereo
     "stereo-large": "facebook/musicgen-stereo-large",   # Best stereo
-    
-    # Meta's internal dataset models (newer but less tested)
-    "small-fb": "facebook/musicgen-small-fb",  # 300M parameters, Meta's data
-    "medium-fb": "facebook/musicgen-medium-fb", # 1.5B parameters, Meta's data
-    "large-fb": "facebook/musicgen-large-fb",   # 3.3B parameters, Meta's data
 }
 
 def init_audio_model(model_name):
@@ -38,7 +33,7 @@ def init_audio_model(model_name):
     # First try to load from HF cache or local path
     try:
         print(f"Attempting to load MusicGen model {model_name}...")
-        audio_processor = AutoProcessor.from_pretrained(checkpoint)
+        audio_processor = MusicgenProcessor.from_pretrained(checkpoint)
         audio_model = MusicgenForConditionalGeneration.from_pretrained(checkpoint)
         
         # If loaded from cache, copy to ComfyUI models directory
@@ -122,12 +117,8 @@ class MusicGen:
                     - medium: 1.5B parameters, balanced
                     - large: 3.3B parameters, highest quality
                     
-                    Specialized models:
-                    - melody/melody-large: For melody-conditioned generation
-                    - stereo-small/medium/large: For spatial audio generation
-                    
-                    Meta's dataset models (newer, less tested):
-                    - small-fb/medium-fb/large-fb: Trained on Meta's internal data"""
+                    Stereo models:
+                    - stereo-small/medium/large: For spatial audio generation"""
             }),
             "prompt": ("STRING", {
                 "multiline": True, 
@@ -172,7 +163,7 @@ class MusicGen:
         if self.audio_model is None or self.current_model != model:
             self.audio_processor, self.audio_model = init_audio_model(model)
             self.current_model = model
-                
+
         inputs = self.audio_processor(
             text=prompt,
             padding=True,
@@ -187,6 +178,7 @@ class MusicGen:
         tokens_per_second = 1500 / 30
         max_tokens = int(tokens_per_second * seconds)
 
+        # Generate audio
         sampling_rate = self.audio_model.config.audio_encoder.sampling_rate
         audio_values = self.audio_model.generate(**inputs.to(device), 
                     do_sample=True, 

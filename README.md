@@ -94,19 +94,23 @@ Features:
   - Melody models:
     - melody: Base melody-conditioned generation
     - melody-large: High quality melody-conditioned generation
+    - stereo-melody: Stereo melody-conditioned generation
   - Stereo models:
     - stereo-small: Basic stereo generation
     - stereo-medium: Better stereo quality
     - stereo-large: Best stereo quality
-  - Meta's dataset models:
-    - small-fb, medium-fb, large-fb: New versions trained on Meta's dataset
-- Adjustable duration (1-1000 seconds)
-- Guidance scale control (0-20)
-- Automatic model download from Hugging Face (downloads only the selected model)
-- Fully compatible with ComfyUI's core audio nodes (VAEDecodeAudio, SaveAudio, PreviewAudio)
-- Supports both CPU and CUDA acceleration
 
-Credits: Original implementation from comfyui-sound-lab by anonymous author
+Inputs:
+- Required:
+  - model: Choose from available MusicGen models
+  - prompt: Text description of the desired music
+  - seconds: Duration of generated audio (1-1000 seconds)
+  - guidance_scale: How closely to follow the text prompt (0-20)
+  - seed: Random seed for reproducible results
+  - device: CPU or auto (uses GPU if available)
+- Optional:
+  - audio: Input audio for melody-conditioned models (ignored by non-melody models)
+  - melody_guidance_scale: Controls how closely melody models follow the input audio
 
 The node outputs audio in the standard ComfyUI AUDIO format, compatible with audio preview and save nodes.
 
