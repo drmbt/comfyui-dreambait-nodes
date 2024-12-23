@@ -5,6 +5,9 @@ lpips
 tsp_solver2
 einops
 tqdm
-numpy>=1.21.0
+numpy>=1.22.0
 torch>=2.0.0
+transformers>=4.30.0
+huggingface-hub>=0.19.0
+pyloudnorm>=0.1.0
 

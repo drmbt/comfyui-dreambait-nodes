@@ -13,6 +13,8 @@ from .nodes.TextLineSelect import TextLineSelect
 from .nodes.TextLinesToList import TextLinesToList
 from .nodes.ListItemExtract import ListItemExtract
 from .nodes.drmbt_image_resize import ImageResizeFaceAware
+from .nodes.MusicGen import MusicGen
+from .nodes.NormalizeAudio import NormalizeAudio
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -29,7 +31,9 @@ NODE_CLASS_MAPPINGS = {
     "TextLineSelect": TextLineSelect,
     "TextLinesToList": TextLinesToList,
     "ListItemExtract": ListItemExtract,
-    "ImageResizeFaceAware": ImageResizeFaceAware
+    "ImageResizeFaceAware": ImageResizeFaceAware,
+    "MusicGen": MusicGen,
+    "NormalizeAudio": NormalizeAudio,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -46,5 +50,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageFrameBlend": "Frame Blend",
     "TextLineSelect": "Text Line Select",
     "TextLinesToList": "Text Lines To List",
-    "ImageResizeFaceAware": "Image Resize Face Aware"
+    "ImageResizeFaceAware": "Image Resize Face Aware",
+    "MusicGen": "MusicGen",
+    "NormalizeAudio": "Normalize Audio",
 }

@@ -38,16 +38,18 @@ class TextLineSelect:
     CATEGORY = "Text Tools"
     DESCRIPTION = "Display text with optional line selection"
     
+    @classmethod
+    def IS_CHANGED(cls, text: Optional[str], select: int, random: bool) -> bool:
+        return True  # Always update when random is enabled to ensure new random selections
+    
     def display_text(self, text: Optional[str], select: int, random: bool):
         if text is None:
             logger.error("Received None for text input in display_text.")
-            return ""
-
-        print("==================")
-        print("IF_AI_tool_output:")
-        print("==================")
-        print(text)
-        
+            return {
+                "ui": {"text": [""]},
+                "result": ("", [], 0, "")
+            }
+            
         # Split text into lines and filter out empty lines
         text_list = [line.strip() for line in text.split('\n') if line.strip()]
         count = len(text_list)
@@ -55,21 +57,21 @@ class TextLineSelect:
         # Handle empty text or no valid lines
         if count == 0:
             return {
-                "ui": {"string": [text]},
+                "ui": {"text": [text]},
                 "result": (text, [], 0, text)
             }
         
         # Select either random or indexed line
         if random:
-            select_index = random.randint(0, count - 1)
+            select_index = random.randrange(count)
         else:
             select_index = select % count if count > 0 else 0
             
         selected = text_list[select_index]
         
-        # Return both UI update and the multiple outputs
+        # Return both UI update and results
         return {
-            "ui": {"string": [text]}, 
+            "ui": {"text": [selected]},  # Show the selected line in the UI
             "result": (
                 text,        # complete text
                 text_list,   # list of individual lines as separate string outputs

@@ -1,9 +1,21 @@
 [project]
 name = "comfyui-dreambait-nodes"
-description = "A collection of forks, QoL nodes and utilities for ComfyUI"
-version = "1.0.0"
+description = "ComfyUI nodes collection featuring ImageResizeFaceAware, FrameBlend, enhanced primitives (Text++, Number++), Load Media, and other package forks and QoL utilities"
+version = "1.1.0"
 license = {file = "LICENSE"}
-dependencies = ["opencv-python"]
+dependencies = [
+    "opencv-python",
+    "piexif",
+    "py7zr",
+    "lpips",
+    "tsp_solver2",
+    "einops",
+    "tqdm",
+    "numpy>=1.21.0",
+    "torch>=2.0.0",
+    "transformers",
+    "huggingface-hub"
+]
 
 [project.urls]
 Repository = "https://github.com/drmbt/comfyui-dreambait-nodes"

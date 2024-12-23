@@ -78,3 +78,71 @@ Converts multi-line text input into a list, with each line as a separate item.
 #### List Item Extract
 
 Extracts a specific item from a list at the given index, with options for handling out-of-range indices.
+
+#### MusicGen
+
+A node that generates music using Meta's MusicGen model based on text prompts. This is a fork of 
+comfyui-sound-lab's musicNode, modified to conform to ComfyUI's standard AUDIO format for better 
+integration with the core audio workflow.
+
+Features:
+- Text-to-music generation using any MusicGen model:
+  - Basic models:
+    - small (300M parameters): Fastest, good for testing
+    - medium (1.5B parameters): Balanced performance
+    - large (3.3B parameters): Highest quality
+  - Melody models:
+    - melody: Base melody-conditioned generation
+    - melody-large: High quality melody-conditioned generation
+  - Stereo models:
+    - stereo-small: Basic stereo generation
+    - stereo-medium: Better stereo quality
+    - stereo-large: Best stereo quality
+  - Meta's dataset models:
+    - small-fb, medium-fb, large-fb: New versions trained on Meta's dataset
+- Adjustable duration (1-1000 seconds)
+- Guidance scale control (0-20)
+- Automatic model download from Hugging Face (downloads only the selected model)
+- Fully compatible with ComfyUI's core audio nodes (VAEDecodeAudio, SaveAudio, PreviewAudio)
+- Supports both CPU and CUDA acceleration
+
+Credits: Original implementation from comfyui-sound-lab by anonymous author
+
+The node outputs audio in the standard ComfyUI AUDIO format, compatible with audio preview and save nodes.
+
+Models are stored in ComfyUI's models directory under 'musicgen/[model_name]' and are downloaded
+automatically when first selected. You can also manually place model files in these directories
+if you've downloaded them separately.
+
+## Available Nodes
+
+### Audio Processing
+
+#### Normalize Audio
+comfy Professional-grade audio normalization using broadcast standards (BS.1770-4) with true-peak limiting.
+
+Inputs:
+- `audio`: AUDIO format input
+- `target_lufs`: Target integrated loudness (default: -14 LUFS for streaming)
+- `true_peak_limit`: Maximum true-peak level (default: -1 dBTP)
+- `normalize_type`: Choose between LUFS or peak normalization
+
+Output:
+- Normalized AUDIO
+
+Example usage:
+1. Connect your audio source to the NormalizeAudio node
+2. Choose normalization type:
+   - LUFS: For streaming/broadcast (measures perceived loudness)
+   - Peak: For sample libraries or technical applications
+3. Set target levels:
+   - Streaming: -14 LUFS, -1 dBTP
+   - Broadcast: -23 LUFS, -2 dBTP
+   - Sample Library: Peak mode, -0.3 dBTP
+4. Connect to output nodes
+
+Technical Details:
+- Uses BS.1770-4 standard for loudness measurement
+- True-peak limiting prevents inter-sample peaks
+- LUFS measurement considers perceived loudness
+- Handles silence and very quiet audio gracefully
