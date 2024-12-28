@@ -1,18 +1,76 @@
 import torch
 import math
 import torch.nn.functional as F
+import os
+import sys
+
+# Debug info for path resolution
+print("\nDreambait Nodes - RIFE Import Debug Info:")
+print(f"Current file location: {os.path.abspath(__file__)}")
+
+# Try to find and add ComfyUI-Frame-Interpolation to path
+comfy_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Remove the extra custom_nodes from the path
+frame_interpolation_path = os.path.join(comfy_path, "ComfyUI-Frame-Interpolation")
+
+print(f"Computed ComfyUI root path: {comfy_path}")
+print(f"Looking for Frame Interpolation at: {frame_interpolation_path}")
+print(f"Path exists: {os.path.exists(frame_interpolation_path)}")
+
+# List contents of parent directory to help debug
+parent_path = os.path.dirname(comfy_path)
+if os.path.exists(parent_path):
+    print("\nContents of parent directory:")
+    for item in os.listdir(parent_path):
+        print(f"- {item}")
+
+if os.path.exists(frame_interpolation_path):
+    if frame_interpolation_path not in sys.path:
+        sys.path.append(frame_interpolation_path)
+        print(f"\nAdded to sys.path: {frame_interpolation_path}")
+    
+    # If directory exists, also check its contents
+    print("\nContents of Frame Interpolation directory:")
+    for item in os.listdir(frame_interpolation_path):
+        print(f"- {item}")
 
 # Try to import RIFE, but don't fail if not available
 try:
     from vfi_models.rife import RIFE_VFI
+    # Test if RIFE is actually functional
+    test = RIFE_VFI()
     RIFE_AVAILABLE = True
-except ImportError:
-    print("RIFE frame interpolation not available - install ComfyUI-Frame-Interpolation for enhanced interpolation")
+    print("\nRIFE import successful!")
+except Exception as e:
+    print(f"\nRIFE frame interpolation not available: {str(e)}")
+    print("To enable RIFE interpolation, install ComfyUI-Frame-Interpolation:")
+    print("1. Install via ComfyUI Manager, or")
+    print("2. Git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation")
+    print("3. Run 'python install.py' in the ComfyUI-Frame-Interpolation folder")
+    print(f"Expected path: {frame_interpolation_path}")
+    print("\nCurrent sys.path:")
+    for path in sys.path:
+        print(f"- {path}")
     RIFE_AVAILABLE = False
 
 class ImageFrameBlend:
     @classmethod
     def INPUT_TYPES(s):
+        # Debug info when node is loaded
+        print("\nDreambait Nodes - RIFE Availability Check:")
+        print(f"RIFE_AVAILABLE = {RIFE_AVAILABLE}")
+        
+        # Print path information
+        comfy_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        frame_interpolation_path = os.path.join(comfy_path, "ComfyUI-Frame-Interpolation")
+        print(f"Looking for RIFE at: {frame_interpolation_path}")
+        print(f"Path exists: {os.path.exists(frame_interpolation_path)}")
+        
+        if os.path.exists(frame_interpolation_path):
+            print("\nFrame Interpolation directory contents:")
+            for item in os.listdir(frame_interpolation_path):
+                print(f"- {item}")
+        
         base_inputs = {
             "required": {
                 "image": ("IMAGE", {
@@ -109,6 +167,17 @@ class ImageFrameBlend:
                 return torch.cat([torch.tensor([0]), middle_indices, torch.tensor([orig_size-1])])
 
     def execute(self, image, target_frames, blend_strength, method="linear", loop_seamless=False, use_rife=True):
+        # Add debugging for RIFE usage
+        if use_rife:
+            print("\nAttempting to use RIFE:")
+            print(f"RIFE_AVAILABLE = {RIFE_AVAILABLE}")
+            if not RIFE_AVAILABLE:
+                print("RIFE not available, falling back to standard interpolation")
+                # Print current sys.path for debugging
+                print("\nCurrent sys.path:")
+                for path in sys.path:
+                    print(f"- {path}")
+
         orig_size = image.shape[0]
 
         # Special handling for single image input - immediately return repeated image
