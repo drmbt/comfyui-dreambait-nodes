@@ -94,9 +94,10 @@ class NumberRemap:
     Supports optional clamping, overriding the number, and pre-multiplying the number."""
     
     @classmethod
-    def IS_CHANGED(cls, value, old_min, old_max, new_min, new_max):
-        # Use default ComfyUI behavior for input change detection
-        return hash((value, old_min, old_max, new_min, new_max))
+    def IS_CHANGED(cls, number, from_range_min, from_range_max, to_range_min, to_range_max, override_number=None, pre_multiply=1.000, clamp_min=None, clamp_max=None):
+        # Hash all input parameters to detect changes
+        return hash((number, from_range_min, from_range_max, to_range_min, to_range_max, 
+                    override_number, pre_multiply, clamp_min, clamp_max))
 
     def number_operation(self, number=0.0, pre_multiply=1.000, override_number=None, from_range_min=0.0, from_range_max=1.0, to_range_min=0.0, to_range_max=1.0, clamp_min=None, clamp_max=None):
         if override_number is not None:
