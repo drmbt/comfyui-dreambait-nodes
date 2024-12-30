@@ -67,7 +67,7 @@ class TextPlusPlus:
     @classmethod
     def IS_CHANGED(cls, prepend, body, override_body, append, delimiter):
         # All text inputs and the delimiter can affect the output
-        return (prepend, body, override_body, append, delimiter)
+        return hash((prepend, body, override_body, append, delimiter))
 
     def text_assemble(self, prepend="", body="", override_body=None, append="", delimiter=" "):
         # Add handling of escape sequences
