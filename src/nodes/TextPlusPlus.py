@@ -65,7 +65,7 @@ class TextPlusPlus:
     CATEGORY = "DRMBT nodes"
 
     @classmethod
-    def IS_CHANGED(cls, prepend, body, override_body, append, delimiter):
+    def IS_CHANGED(cls, body, delimiter, prepend="", override_body="", append=""):
         # All text inputs and the delimiter can affect the output
         return hash((prepend, body, override_body, append, delimiter))
 
