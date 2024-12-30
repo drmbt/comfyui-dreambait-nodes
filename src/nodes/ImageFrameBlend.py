@@ -17,22 +17,10 @@ print(f"Computed ComfyUI root path: {comfy_path}")
 print(f"Looking for Frame Interpolation at: {frame_interpolation_path}")
 print(f"Path exists: {os.path.exists(frame_interpolation_path)}")
 
-# List contents of parent directory to help debug
-parent_path = os.path.dirname(comfy_path)
-if os.path.exists(parent_path):
-    print("\nContents of parent directory:")
-    for item in os.listdir(parent_path):
-        print(f"- {item}")
-
 if os.path.exists(frame_interpolation_path):
     if frame_interpolation_path not in sys.path:
         sys.path.append(frame_interpolation_path)
         print(f"\nAdded to sys.path: {frame_interpolation_path}")
-    
-    # If directory exists, also check its contents
-    print("\nContents of Frame Interpolation directory:")
-    for item in os.listdir(frame_interpolation_path):
-        print(f"- {item}")
 
 # Try to import RIFE, but don't fail if not available
 try:
@@ -65,11 +53,6 @@ class ImageFrameBlend:
         frame_interpolation_path = os.path.join(comfy_path, "ComfyUI-Frame-Interpolation")
         print(f"Looking for RIFE at: {frame_interpolation_path}")
         print(f"Path exists: {os.path.exists(frame_interpolation_path)}")
-        
-        if os.path.exists(frame_interpolation_path):
-            print("\nFrame Interpolation directory contents:")
-            for item in os.listdir(frame_interpolation_path):
-                print(f"- {item}")
         
         base_inputs = {
             "required": {
