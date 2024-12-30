@@ -44,16 +44,6 @@ except Exception as e:
 class ImageFrameBlend:
     @classmethod
     def INPUT_TYPES(s):
-        # Debug info when node is loaded
-        print("\nDreambait Nodes - RIFE Availability Check:")
-        print(f"RIFE_AVAILABLE = {RIFE_AVAILABLE}")
-        
-        # Print path information
-        comfy_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        frame_interpolation_path = os.path.join(comfy_path, "ComfyUI-Frame-Interpolation")
-        print(f"Looking for RIFE at: {frame_interpolation_path}")
-        print(f"Path exists: {os.path.exists(frame_interpolation_path)}")
-        
         base_inputs = {
             "required": {
                 "image": ("IMAGE", {
