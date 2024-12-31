@@ -4,42 +4,22 @@ import torch.nn.functional as F
 import os
 import sys
 
-# Debug info for path resolution
-print("\nDreambait Nodes - RIFE Import Debug Info:")
-print(f"Current file location: {os.path.abspath(__file__)}")
-
 # Try to find and add ComfyUI-Frame-Interpolation to path
 comfy_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-# Remove the extra custom_nodes from the path
 frame_interpolation_path = os.path.join(comfy_path, "ComfyUI-Frame-Interpolation")
 
-print(f"Computed ComfyUI root path: {comfy_path}")
-print(f"Looking for Frame Interpolation at: {frame_interpolation_path}")
-print(f"Path exists: {os.path.exists(frame_interpolation_path)}")
+if os.path.exists(frame_interpolation_path) and frame_interpolation_path not in sys.path:
+    sys.path.append(frame_interpolation_path)
 
-if os.path.exists(frame_interpolation_path):
-    if frame_interpolation_path not in sys.path:
-        sys.path.append(frame_interpolation_path)
-        print(f"\nAdded to sys.path: {frame_interpolation_path}")
-
-# Try to import RIFE, but don't fail if not available
+# Try to import RIFE
 try:
     from vfi_models.rife import RIFE_VFI
-    # Test if RIFE is actually functional
     test = RIFE_VFI()
     RIFE_AVAILABLE = True
-    print("\nRIFE import successful!")
-except Exception as e:
-    print(f"\nRIFE frame interpolation not available: {str(e)}")
-    print("To enable RIFE interpolation, install ComfyUI-Frame-Interpolation:")
-    print("1. Install via ComfyUI Manager, or")
-    print("2. Git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation")
-    print("3. Run 'python install.py' in the ComfyUI-Frame-Interpolation folder")
-    print(f"Expected path: {frame_interpolation_path}")
-    print("\nCurrent sys.path:")
-    for path in sys.path:
-        print(f"- {path}")
+    print("ImageFrameBlend: RIFE interpolation enabled")
+except Exception:
     RIFE_AVAILABLE = False
+    print("ImageFrameBlend: RIFE interpolation not available. Install ComfyUI-Frame-Interpolation to enable.")
 
 class ImageFrameBlend:
     @classmethod
@@ -140,16 +120,8 @@ class ImageFrameBlend:
                 return torch.cat([torch.tensor([0]), middle_indices, torch.tensor([orig_size-1])])
 
     def execute(self, image, target_frames, blend_strength, method="linear", loop_seamless=False, use_rife=True):
-        # Add debugging for RIFE usage
-        if use_rife:
-            print("\nAttempting to use RIFE:")
-            print(f"RIFE_AVAILABLE = {RIFE_AVAILABLE}")
-            if not RIFE_AVAILABLE:
-                print("RIFE not available, falling back to standard interpolation")
-                # Print current sys.path for debugging
-                print("\nCurrent sys.path:")
-                for path in sys.path:
-                    print(f"- {path}")
+        if use_rife and not RIFE_AVAILABLE:
+            use_rife = False
 
         orig_size = image.shape[0]
 
