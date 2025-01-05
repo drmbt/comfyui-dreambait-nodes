@@ -14,7 +14,8 @@ dependencies = [
     "numpy>=1.21.0",
     "torch>=2.0.0",
     "transformers",
-    "huggingface-hub"
+    "huggingface-hub",
+    "moviepy"
 ]
 
 [project.urls]
