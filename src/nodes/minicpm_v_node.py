@@ -99,14 +99,24 @@ class DownloadAndLoadMiniCPMV:
             model_class = AutoModel if is_int4 else AutoModelForCausalLM
             print(f"Using model class: {model_class.__name__}")
             
+            # Prepare model loading kwargs based on version
+            model_kwargs = {
+                "trust_remote_code": True,
+                "attn_implementation": attention,
+                "torch_dtype": compute_dtype,
+                "device_map": self.device  # Use ComfyUI's device management
+            }
+            
+            # Add int4-specific parameters only for int4 version
+            if is_int4:
+                model_kwargs.update({
+                    "load_in_4bit": True,
+                    "bnb_4bit_compute_dtype": compute_dtype
+                })
+
             self.model = model_class.from_pretrained(
                 cache_dir,
-                trust_remote_code=True,
-                attn_implementation=attention,
-                torch_dtype=compute_dtype,
-                load_in_4bit=is_int4,
-                bnb_4bit_compute_dtype=compute_dtype,
-                device_map=self.device  # Use ComfyUI's device management
+                **model_kwargs
             ).eval()
 
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -188,6 +198,10 @@ class MiniCPMVNode:
                     "step": 0.1,
                     "tooltip": "Higher values make output more random, lower values more deterministic"
                 }),
+                "force_offload": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "If true, the model will be offloaded to save memory after generation"
+                }),
             }
         }
 
@@ -195,7 +209,7 @@ class MiniCPMVNode:
     FUNCTION = "process"
     CATEGORY = "MiniCPM-V"
 
-    def process(self, minicpmv_model, question, image=None, path="", n_frames=4, max_tokens=512, seed=0, temperature=1.0):
+    def process(self, minicpmv_model, question, image=None, path="", n_frames=4, max_tokens=512, seed=0, temperature=1.0, force_offload=True):
         if self.model is None:
             print("Loading model components...")
             self.model = minicpmv_model["model"].to(self.device)
@@ -273,6 +287,13 @@ class MiniCPMVNode:
                 max_new_tokens=max_tokens,
                 **params
             )
+
+            # If force_offload is enabled, move model to offload device and clear memory
+            if force_offload:
+                self.model = self.model.to(self.offload_device)
+                self.model = None
+                mm.soft_empty_cache()
+
             return (generated_text,)
         except Exception as e:
             print(f"Error during generation: {str(e)}")

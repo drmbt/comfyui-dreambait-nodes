@@ -16,6 +16,9 @@ from .nodes.drmbt_image_resize import ImageResizeFaceAware
 from .nodes.MusicGen import MusicGen
 from .nodes.NormalizeAudio import NormalizeAudio
 from .nodes.minicpm_v_node import MiniCPMVNode, DownloadAndLoadMiniCPMV
+from .nodes.qwen2_audio_instruct import Qwen2AudioInstruct
+from .nodes.LoadAudioPlus import LoadAudioPlus, PreviewAudioPlus, AudioInfoPlus
+from .nodes.utils import DynamicDictionary
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -37,6 +40,10 @@ NODE_CLASS_MAPPINGS = {
     "NormalizeAudio": NormalizeAudio,
     "MiniCPMVNode": MiniCPMVNode,
     "DownloadAndLoadMiniCPMV": DownloadAndLoadMiniCPMV,
+    "Qwen2AudioInstruct": Qwen2AudioInstruct,
+    "LoadAudioPlus": LoadAudioPlus,
+    "AudioInfoPlus": AudioInfoPlus,
+    "DynamicDictionary": DynamicDictionary
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -58,4 +65,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NormalizeAudio": "Normalize Audio",
     "MiniCPMVNode": "MiniCPM-V Q&A",
     "DownloadAndLoadMiniCPMV": "Load MiniCPM-V Model",
+    "Qwen2AudioInstruct": "Qwen2 Audio Q&A",
+    "LoadAudioPlus": "Load Audio Plus +",
+    "AudioInfoPlus": "Audio Info Plus + 🎵",
+    "DynamicDictionary": "Dynamic Dictionary"
 }
