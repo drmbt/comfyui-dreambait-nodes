@@ -15,6 +15,7 @@ from .nodes.ListItemExtract import ListItemExtract
 from .nodes.drmbt_image_resize import ImageResizeFaceAware
 from .nodes.MusicGen import MusicGen
 from .nodes.NormalizeAudio import NormalizeAudio
+from .nodes.minicpm_v_node import MiniCPMVNode, DownloadAndLoadMiniCPMV
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -34,6 +35,8 @@ NODE_CLASS_MAPPINGS = {
     "ImageResizeFaceAware": ImageResizeFaceAware,
     "MusicGen": MusicGen,
     "NormalizeAudio": NormalizeAudio,
+    "MiniCPMVNode": MiniCPMVNode,
+    "DownloadAndLoadMiniCPMV": DownloadAndLoadMiniCPMV,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -53,4 +56,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageResizeFaceAware": "Image Resize Face Aware",
     "MusicGen": "MusicGen",
     "NormalizeAudio": "Normalize Audio",
+    "MiniCPMVNode": "MiniCPM-V Q&A",
+    "DownloadAndLoadMiniCPMV": "Load MiniCPM-V Model",
 }

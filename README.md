@@ -79,6 +79,19 @@ Converts multi-line text input into a list, with each line as a separate item.
 
 Extracts a specific item from a list at the given index, with options for handling out-of-range indices.
 
+#### MiniCPM-V
+
+A node that provides access to OpenBMB's MiniCPM-V multimodal model for image and video analysis. Supports both the full model and a memory-efficient int4 version.
+
+- Text analysis of images and videos
+- Support for both full and int4 quantized models
+
+Models:
+- MiniCPM-V (Full): Best quality, higher VRAM usage
+- MiniCPM-V-2_6-int4: 7GB VRAM usage, good quality/performance balance
+
+Requires Hugging Face authentication (free) for model download.
+
 #### MusicGen
 
 A node that generates music using Meta's MusicGen model based on text prompts. This is a fork of 

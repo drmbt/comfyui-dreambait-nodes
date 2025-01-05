@@ -1,6 +1,6 @@
 numpy>=1.22.0
 torch>=2.0.0
-transformers>=4.31.0
+transformers>=4.40.0
 huggingface-hub>=0.19.0
 pyloudnorm>=0.1.0
 piexif
@@ -8,3 +8,7 @@ moviepy
 py7zr
 tsp_solver
 lpips
+sentencepiece>=0.1.99
+pillow>=10.1.0
+bitsandbytes>=0.43.1
+accelerate>=0.30.1
