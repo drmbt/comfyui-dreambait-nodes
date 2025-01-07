@@ -18,7 +18,7 @@ from .nodes.NormalizeAudio import NormalizeAudio
 from .nodes.minicpm_v_node import MiniCPMVNode, DownloadAndLoadMiniCPMV
 from .nodes.qwen2_audio_instruct import Qwen2AudioInstruct
 from .nodes.LoadAudioPlus import LoadAudioPlus, PreviewAudioPlus, AudioInfoPlus
-from .nodes.utils import DynamicDictionary
+from .nodes.utils import DynamicDictionary, StringToDict, DictToOutputs
 from .nodes.folder_opener import DreambaitFolderOpener
 
 NODE_CLASS_MAPPINGS = {
@@ -45,6 +45,8 @@ NODE_CLASS_MAPPINGS = {
     "LoadAudioPlus": LoadAudioPlus,
     "AudioInfoPlus": AudioInfoPlus,
     "DynamicDictionary": DynamicDictionary,
+    "StringToDict": StringToDict,
+    "DictToOutputs": DictToOutputs,
     "DreambaitFolderOpener": DreambaitFolderOpener
 }
 
@@ -71,5 +73,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoadAudioPlus": "Load Audio Plus +",
     "AudioInfoPlus": "Audio Info Plus + 🎵",
     "DynamicDictionary": "Dynamic Dictionary",
+    "StringToDict": "Smart Dictionary from String 📝",
+    "DictToOutputs": "Dictionary to Outputs 🔀",
     "DreambaitFolderOpener": "Dreambait Folder Opener 📁"
 }

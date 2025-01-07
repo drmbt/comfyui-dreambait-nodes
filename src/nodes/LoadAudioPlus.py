@@ -95,6 +95,11 @@ class LoadAudioPlus:
     OUTPUT_NODE = True
 
     def load(self, audio, audio_upload=None):
+        # Add output_info parameter to track if audio_info is needed
+        output_info = not (hasattr(self, 'return_names_to_compute') and 
+                         self.return_names_to_compute is not None and 
+                         "audio_info" not in self.return_names_to_compute)
+        
         if audio_upload is not None:
             audio = audio_upload
             
@@ -114,17 +119,17 @@ class LoadAudioPlus:
                     
                     if len(audio_array.shape) == 1:
                         waveform = torch.from_numpy(audio_array[None, :])
-                        num_channels = 1
+                        num_channels = 1 if output_info else None
                     else:
                         waveform = torch.from_numpy(audio_array.T)
-                        num_channels = waveform.shape[0]
+                        num_channels = waveform.shape[0] if output_info else None
                     
                     waveform = waveform.float()
                     
                     if waveform.abs().max() > 1.0:
                         waveform = waveform / waveform.abs().max()
 
-                    duration = len(audio_array) / sample_rate
+                    duration = len(audio_array) / sample_rate if output_info else None
                 
             except Exception as e:
                 raise RuntimeError(f"Error loading video file {audio_path}: {str(e)}")
@@ -139,8 +144,12 @@ class LoadAudioPlus:
                 try:
                     torchaudio.set_audio_backend(name)
                     waveform, sample_rate = torchaudio.load(audio_path)
-                    num_channels = waveform.shape[0]
-                    duration = waveform.shape[1] / sample_rate
+                    if output_info:
+                        num_channels = waveform.shape[0]
+                        duration = waveform.shape[1] / sample_rate
+                    else:
+                        num_channels = None
+                        duration = None
                     break
                 except Exception as e:
                     last_error = e
@@ -150,11 +159,11 @@ class LoadAudioPlus:
         # Create audio data dictionary
         audio_data = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
 
-        # Create audio info dictionary
+        # Always create audio_info since AudioInfoPlus needs it
         audio_info = {
             "sample_rate": sample_rate,
-            "num_channels": num_channels,
-            "duration": duration,
+            "num_channels": num_channels if output_info else waveform.shape[0],
+            "duration": duration if output_info else waveform.shape[1] / sample_rate,
             "num_samples": waveform.shape[1],
             "file_path": audio_path,
             "file_name": os.path.basename(audio_path),
@@ -205,6 +214,9 @@ class AudioInfoPlus:
     FUNCTION = "get_audio_info"
 
     def get_audio_info(self, audio_info):
+        if audio_info is None:
+            raise ValueError("Audio info is None. Make sure the audio file was loaded correctly.")
+
         # Calculate amplitude statistics from the waveform
         waveform = audio_info["waveform"]
         max_amplitude = float(torch.max(torch.abs(waveform)))
