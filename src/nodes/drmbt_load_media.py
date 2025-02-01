@@ -37,6 +37,9 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import subprocess
 from .sort_visual_path import main as sort_visual_path_main
+import glob
+from typing import Union, List
+import folder_paths
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
@@ -124,6 +127,50 @@ def sort_visual_path(images, filenames):
     sorted_filenames = [filenames[i] for i in col_ind]
     return sorted_filenames
 
+def load_path(path: str) -> Union[str, List[str]]:
+    """
+    Resolves a path that can be either:
+    - An absolute path to a file or directory
+    - A relative path from input directory to a file or directory
+    - A path with [input]/[output]/[temp] annotations
+    - A wildcard pattern for image files
+    
+    Returns either a single path string or list of paths if wildcards matched multiple images
+    """
+    path = path.strip('"').strip("'").replace("\\", "/")
+    
+    # Handle annotated paths
+    if "[" in path:
+        name, base_dir = folder_paths.annotated_filepath(path)
+        if base_dir is not None:
+            full_path = os.path.join(base_dir, name)
+            # Check for wildcards in image patterns
+            if ('*' in name or '?' in name) and any(name.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.webp', '.gif']):
+                matches = glob.glob(full_path, recursive=True)
+                if matches:
+                    return [os.path.abspath(p) for p in matches]
+            elif os.path.exists(full_path):
+                return os.path.abspath(full_path)
+    
+    # Try as absolute path with wildcards for images
+    if ('*' in path or '?' in path) and any(path.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.webp', '.gif']):
+        matches = glob.glob(path, recursive=True)
+        if matches:
+            return [os.path.abspath(p) for p in matches]
+    elif os.path.exists(path):
+        return os.path.abspath(path)
+        
+    # Try in input directory
+    input_path = os.path.join(folder_paths.get_input_directory(), path)
+    if ('*' in path or '?' in path) and any(path.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.webp', '.gif']):
+        matches = glob.glob(input_path, recursive=True)
+        if matches:
+            return [os.path.abspath(p) for p in matches]
+    elif os.path.exists(input_path):
+        return os.path.abspath(input_path)
+            
+    raise FileNotFoundError(f"Could not find file or directory at {path} or {input_path}")
+
 class LoadMedia:
 
     @classmethod
@@ -132,7 +179,7 @@ class LoadMedia:
             "required": {
                 "path": ("STRING", {
                     "image_upload": True,
-                    "tooltip": "Path to media file(s). Can be an image, directory of images, video file, zip/tar archive, or URL."
+                    "tooltip": "Path to media file(s). Can be an image, directory of images, video file, zip/tar archive, URL, or wildcard pattern for images (e.g. *.png)."
                 }),
                 "resize_images_to_first": ("BOOLEAN", {
                     "default": True,
@@ -199,87 +246,197 @@ Key Features:
     def load_media(self, path, seed, image_load_cap, start_index, start_index_use_seed, error_after_last_frame, skip_n, resize_images_to_first, sort, reverse_order, loop_first_frame):
         if start_index_use_seed:
             start_index = seed
-        path = path.strip('"').strip("'")
-        # Handle URL downloads
-        if path.startswith(("http://", "https://")):
-            local_filename = self.get_local_file_path(path)
-            if not os.path.exists(local_filename):
-                self.download_file(path, local_filename)
-            path = local_filename
-        else:
-            path = os.path.normpath(path)
 
-        # Update parent_directory logic
-        if os.path.isdir(path):
-            parent_directory = path
-        else:
-            parent_directory = os.path.dirname(path)
+        try:
+            resolved_path = load_path(path)
+            
+            # If we got a list of paths from wildcard matching
+            if isinstance(resolved_path, list):
+                # Sort the paths if needed
+                if sort == "alphabetical":
+                    resolved_path.sort(key=lambda x: x.lower())
+                elif sort == "date_created":
+                    resolved_path.sort(key=lambda x: os.path.getctime(x))
+                elif sort == "date_modified":
+                    resolved_path.sort(key=lambda x: os.path.getmtime(x))
+                elif sort == "random":
+                    random.seed(seed)
+                    random.shuffle(resolved_path)
+                elif sort == "visual_path":
+                    # Load images for visual sorting
+                    images = []
+                    valid_paths = []
+                    first_size = None
+                    for img_path in resolved_path:
+                        try:
+                            img = Image.open(img_path)
+                            img = ImageOps.exif_transpose(img)
+                            if first_size is None:
+                                first_size = img.size
+                            if resize_images_to_first:
+                                if img.size != first_size:
+                                    img = self.resize_right(img, first_size)
+                            elif img.size != first_size:
+                                continue
+                            images.append(img)
+                            valid_paths.append(img_path)
+                        except Exception as e:
+                            print(f"Warning: Could not load image {img_path}: {e}")
+                            continue
+                    
+                    if not images:
+                        raise ValueError("No valid images found for visual path sorting")
+                    
+                    # Sort using visual path
+                    sorted_indices = sort_visual_path(images, list(range(len(images))))
+                    resolved_path = [valid_paths[i] for i in sorted_indices]
+                
+                if reverse_order:
+                    resolved_path.reverse()
 
-        # Define legal extensions
-        legal_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z']
+                # Apply start_index and skip_n
+                if skip_n > 0:
+                    resolved_path = resolved_path[start_index::skip_n + 1]
+                else:
+                    resolved_path = resolved_path[start_index:]
 
-        # Handle directories
-        if os.path.isdir(path):
-            dir_files = os.listdir(path)
-            # Filter files to only include those with legal extensions
-            dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in legal_extensions)]
-            frame_count = len([f for f in dir_files if os.path.isfile(os.path.join(path, f))])
-        # Handle video files
-        elif path.lower().endswith(('.mp4', '.mov')):
-            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
-        # Handle archive files
-        elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
-            tmpdirname = self.create_persistent_temp_dir(os.path.splitext(os.path.basename(path))[0])
-            logger.debug(f"Extracting archive to temporary directory: {tmpdirname}")
-            if path.lower().endswith('.zip'):
-                with zipfile.ZipFile(path, 'r') as z:
-                    z.extractall(tmpdirname)
-            elif path.lower().endswith('.7z'):
-                with py7zr.SevenZipFile(path, mode='r') as z:
-                    z.extractall(path=tmpdirname)
+                # Apply image_load_cap
+                if image_load_cap > 0:
+                    resolved_path = resolved_path[:image_load_cap]
+
+                # Handle loop_first_frame
+                if loop_first_frame and resolved_path:
+                    resolved_path.append(resolved_path[0])
+                    
+                # Create a temporary directory to handle the matched files
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    # Load and process all images first to ensure consistent sizing
+                    images = []
+                    first_size = None
+                    for src_path in resolved_path:
+                        try:
+                            img = Image.open(src_path)
+                            img = ImageOps.exif_transpose(img)
+                            if first_size is None:
+                                first_size = img.size
+                            if resize_images_to_first and img.size != first_size:
+                                img = self.resize_right(img, first_size)
+                            elif not resize_images_to_first and img.size != first_size:
+                                raise ValueError(f"Image size mismatch: {src_path} is {img.size}, expected {first_size}. Enable resize_images_to_first to automatically resize.")
+                            images.append(img)
+                        except Exception as e:
+                            print(f"Warning: Could not load image {src_path}: {e}")
+                            continue
+
+                    if not images:
+                        raise ValueError("No valid images found in wildcard match")
+
+                    # Save processed images to temp directory
+                    for i, img in enumerate(images):
+                        dst_path = os.path.join(temp_dir, f"{i:08d}.png")
+                        img.save(dst_path)
+                    
+                    # Process as directory using existing function
+                    return self.load_images_from_folder(
+                        path=temp_dir,
+                        image_load_cap=0,  # We've already applied the cap
+                        start_index=0,     # We've already applied the start index
+                        skip_n=0,          # We've already applied skip_n
+                        resize_images_to_first=False,  # Images are already resized
+                        seed=seed,
+                        sort="None",       # Already sorted
+                        reverse_order=False,  # Already reversed if needed
+                        parent_directory=os.path.dirname(resolved_path[0]),
+                        loop_first_frame=False  # Already handled loop frame
+                    )
+            
+            # Handle single path (file, directory, or archive)
+            path = resolved_path
+            
+            # Rest of your existing code for handling the path...
+            if path.startswith(("http://", "https://")):
+                local_filename = self.get_local_file_path(path)
+                if not os.path.exists(local_filename):
+                    self.download_file(path, local_filename)
+                path = local_filename
             else:
-                with tarfile.open(path, 'r') as t:
-                    t.extractall(tmpdirname)
+                path = os.path.normpath(path)
 
-            # Verify extraction
-            logger.debug(f"Contents of {tmpdirname}: {os.listdir(tmpdirname)}")
-            extracted_items = os.listdir(tmpdirname)
-            if len(extracted_items) == 1 and os.path.isdir(os.path.join(tmpdirname, extracted_items[0])):
-                # If there's only one directory, update the path to that directory
-                tmpdirname = os.path.join(tmpdirname, extracted_items[0])
-                logger.debug(f"Single directory found, updating path to: {tmpdirname}")
-            path = tmpdirname
-            parent_directory = path  # Update parent_directory to the extracted directory
-            frame_count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
-        else:
-            frame_count = 1
+            # Update parent_directory logic
+            if os.path.isdir(path):
+                parent_directory = path
+            else:
+                parent_directory = os.path.dirname(path)
 
-        # Check for subfolder if no frames found
-        if frame_count == 0:
-            logger.debug(f"No frames found in {path}. Checking for subfolders.")
-            subdirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
-            if len(subdirs) == 1:
-                path = os.path.join(path, subdirs[0])
-                logger.debug(f"Subfolder found, updating path to: {path}")
+            # Define legal extensions
+            legal_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z']
+
+            # Handle directories
+            if os.path.isdir(path):
+                dir_files = os.listdir(path)
+                # Filter files to only include those with legal extensions
+                dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in legal_extensions)]
+                frame_count = len([f for f in dir_files if os.path.isfile(os.path.join(path, f))])
+            # Handle video files
+            elif path.lower().endswith(('.mp4', '.mov')):
+                return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+            # Handle archive files
+            elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
+                tmpdirname = self.create_persistent_temp_dir(os.path.splitext(os.path.basename(path))[0])
+                logger.debug(f"Extracting archive to temporary directory: {tmpdirname}")
+                if path.lower().endswith('.zip'):
+                    with zipfile.ZipFile(path, 'r') as z:
+                        z.extractall(tmpdirname)
+                elif path.lower().endswith('.7z'):
+                    with py7zr.SevenZipFile(path, mode='r') as z:
+                        z.extractall(path=tmpdirname)
+                else:
+                    with tarfile.open(path, 'r') as t:
+                        t.extractall(tmpdirname)
+
+                # Verify extraction
+                logger.debug(f"Contents of {tmpdirname}: {os.listdir(tmpdirname)}")
+                extracted_items = os.listdir(tmpdirname)
+                if len(extracted_items) == 1 and os.path.isdir(os.path.join(tmpdirname, extracted_items[0])):
+                    # If there's only one directory, update the path to that directory
+                    tmpdirname = os.path.join(tmpdirname, extracted_items[0])
+                    logger.debug(f"Single directory found, updating path to: {tmpdirname}")
+                path = tmpdirname
+                parent_directory = path  # Update parent_directory to the extracted directory
                 frame_count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
-
-        if frame_count == 0:
-            raise ValueError(f"No valid frames found in the provided path: {path}")
-
-        if start_index >= frame_count:
-            if error_after_last_frame:
-                raise ValueError(f"start_index {start_index} is greater than the number of frames {frame_count}.")
             else:
-                start_index = start_index % frame_count
+                frame_count = 1
 
-        if os.path.isdir(path):
-            return self.load_images_from_folder(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
-        elif path.lower().endswith(('.mp4', '.mov')):
-            return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
-        elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
-            return self.load_images_from_archive(path=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, skip_n=skip_n, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
-        else:
-            return self.load_image(image=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
+            # Check for subfolder if no frames found
+            if frame_count == 0:
+                logger.debug(f"No frames found in {path}. Checking for subfolders.")
+                subdirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+                if len(subdirs) == 1:
+                    path = os.path.join(path, subdirs[0])
+                    logger.debug(f"Subfolder found, updating path to: {path}")
+                    frame_count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
+
+            if frame_count == 0:
+                raise ValueError(f"No valid frames found in the provided path: {path}")
+
+            if start_index >= frame_count:
+                if error_after_last_frame:
+                    raise ValueError(f"start_index {start_index} is greater than the number of frames {frame_count}.")
+                else:
+                    start_index = start_index % frame_count
+
+            if os.path.isdir(path):
+                return self.load_images_from_folder(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
+            elif path.lower().endswith(('.mp4', '.mov')):
+                return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+            elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
+                return self.load_images_from_archive(path=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, skip_n=skip_n, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
+            else:
+                return self.load_image(image=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory)
+
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            raise
 
     def get_local_file_path(self, url):
         # Extract the file extension from the URL

@@ -222,7 +222,7 @@ def main(directory, target_n_pixels, optim_steps=1000, list_only=True, copy_meta
 
     print("Solving traveling salesman problem...")
     start_time = time.time()
-    path_indices = solve_tsp(distance_matrix, optim_steps=optim_steps, endpoints=None)
+    path_indices = solve_tsp(distance_matrix, optim_steps=optim_steps)
     path = [filenames[idx] for idx in path_indices]
     print(f"Finished solving TSP in {time.time() - start_time:.2f} seconds")
     print(f"!!! path: {path}")
