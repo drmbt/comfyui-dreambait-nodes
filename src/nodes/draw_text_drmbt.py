@@ -2,6 +2,14 @@ import numpy as np
 import torch
 import os
 from PIL import Image, ImageDraw, ImageFont
+import pyphen  # Simple import, requirements.txt will handle installation
+
+'''
+this node forked from ComfyUI_Comfyroll_CustomNodes draw_text, but corrects mislabled 
+justify and vertical align options, implements justify and properly, adds hyphenation
+'''
+
+
 
 # Constants from original
 COLORS = ["custom", "white", "black", "red", "green", "blue", "yellow",
@@ -44,7 +52,12 @@ color_mapping = {
 
 VERTICAL_ALIGN_OPTIONS = ["center", "top", "bottom"]
 HORIZONTAL_ALIGN_OPTIONS = ["center", "left", "right", "justify"]
-PERSPECTIVE_OPTIONS = ["top", "bottom", "left", "right"]
+ROTATE_OPTIONS = ["text center", "image center"]
+
+# Add to existing constants
+LANGUAGES = ["en_US", "en_GB", "de_DE", "fr_FR", "es_ES", "it_IT"]  # Add more as needed
+
+POSITION_MODES = ["pixels", "fraction"]
 
 # Helper functions from functions_graphics.py
 def tensor2pil(image):
@@ -95,27 +108,70 @@ def get_color_values(color, color_hex, color_mapping):
         color_rgb = color_mapping.get(color, (0, 0, 0))
     return color_rgb
 
-def wrap_text(draw, text, font, max_width, margins):
-    """Smart word wrap that returns lines of text that fit within max_width."""
+def try_hyphenate_word(dic, word, draw, font, remaining_width):
+    """Attempt to hyphenate a word to fit the remaining width."""
+    if not dic:
+        return None
+        
+    # Get possible hyphenation points
+    hyphenated = dic.inserted(word)
+    if not hyphenated:
+        return None
+        
+    # Split at each hyphenation point and test
+    parts = hyphenated.split('=')
+    for i in range(len(parts)-1):
+        first_part = ''.join(parts[:i+1]) + '-'
+        first_width, _ = get_text_size(draw, first_part, font)
+        if first_width <= remaining_width:
+            second_part = ''.join(parts[i+1:])
+            return (first_part, second_part)
+    
+    return None
+
+def wrap_text(draw, text, font, max_width, margins, language="en_US"):
+    """Smart word wrap with hyphenation that returns lines of text that fit within max_width."""
+    try:
+        dic = pyphen.Pyphen(lang=language)
+    except:
+        dic = None  # Fallback to no hyphenation if language not supported
+        
     words = text.split()
     lines = []
     current_line = []
     current_width = 0
+    space_width, _ = get_text_size(draw, " ", font)
     
     for word in words:
         word_width, _ = get_text_size(draw, word, font)
-        space_width, _ = get_text_size(draw, " ", font)
         
-        # Check if adding this word would exceed the max width
-        if current_line and current_width + word_width + space_width > max_width - (2 * margins):
-            # Add the current line to lines and start a new line
-            lines.append(" ".join(current_line))
-            current_line = [word]
-            current_width = word_width
-        else:
-            # Add word to current line
+        # If word fits on current line
+        if not current_line or current_width + word_width + space_width <= max_width - (2 * margins):
             current_line.append(word)
             current_width += word_width + (space_width if current_line else 0)
+            continue
+            
+        # Try hyphenation if word doesn't fit
+        if word_width > max_width - (2 * margins) - (current_width if current_line else 0):
+            remaining_width = max_width - (2 * margins) - (current_width if current_line else 0)
+            hyphenated = try_hyphenate_word(dic, word, draw, font, remaining_width)
+            
+            if hyphenated:
+                first_part, second_part = hyphenated
+                if current_line:
+                    current_line.append(first_part)
+                    lines.append(" ".join(current_line))
+                else:
+                    lines.append(first_part)
+                current_line = [second_part]
+                current_width = get_text_size(draw, second_part, font)[0]
+                continue
+        
+        # If we get here, add current line and start new one
+        if current_line:
+            lines.append(" ".join(current_line))
+        current_line = [word]
+        current_width = word_width
     
     # Add the last line if there's anything left
     if current_line:
@@ -231,12 +287,15 @@ class DrawText:
                     "background_color": (COLORS,),
                     "vertical_align": (VERTICAL_ALIGN_OPTIONS,),
                     "horizontal_align": (HORIZONTAL_ALIGN_OPTIONS,),
+                    "x_percent": ("FLOAT", {"default": 50.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+                    "y_percent": ("FLOAT", {"default": 50.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+                    "x_offset": ("INT", {"default": 0, "min": -4096, "max": 4096}),
+                    "y_offset": ("INT", {"default": 0, "min": -4096, "max": 4096}),
                     "margins": ("INT", {"default": 0, "min": -1024, "max": 1024}),
                     "line_spacing": ("INT", {"default": 0, "min": -1024, "max": 1024}),
-                    "position_x": ("INT", {"default": 0, "min": -4096, "max": 4096}),
-                    "position_y": ("INT", {"default": 0, "min": -4096, "max": 4096}),
                     "rotation_angle": ("FLOAT", {"default": 0.0, "min": -360.0, "max": 360.0, "step": 0.1}),
-                    "rotation_options": (PERSPECTIVE_OPTIONS,),            
+                    "rotation_options": (ROTATE_OPTIONS,),
+                    "language": (LANGUAGES, {"default": "en_US"}),
                 },
                 "optional": {
                     "font_color_hex": ("STRING", {"multiline": False, "default": "#000000"}),
@@ -250,9 +309,15 @@ class DrawText:
 
     def draw_text(self, image_width, image_height, text,
                   font_name, font_size, font_color, background_color,
-                  margins, line_spacing, position_x, position_y,
+                  margins, line_spacing, 
+                  x_percent, y_percent, x_offset, y_offset,
                   vertical_align, horizontal_align, rotation_angle, rotation_options,
+                  language="en_US",
                   font_color_hex='#000000', bg_color_hex='#000000'):
+
+        # Calculate final position from percentage and offset
+        pixel_x = int((x_percent / 100.0) * image_width) + x_offset
+        pixel_y = int((y_percent / 100.0) * image_height) + y_offset
 
         text_color = get_color_values(font_color, font_color_hex, color_mapping)
         bg_color = get_color_values(background_color, bg_color_hex, color_mapping)
@@ -264,7 +329,7 @@ class DrawText:
 
         rotated_text_mask = draw_masked_text(text_mask, text, font_name, font_size,
                                            margins, line_spacing,
-                                           position_x, position_y,
+                                           pixel_x, pixel_y,
                                            vertical_align, horizontal_align,
                                            rotation_angle, rotation_options)
 
