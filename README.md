@@ -131,6 +131,45 @@ Models are stored in ComfyUI's models directory under 'musicgen/[model_name]' an
 automatically when first selected. You can also manually place model files in these directories
 if you've downloaded them separately.
 
+#### Draw Text
+
+A comprehensive text rendering node that combines and enhances features from multiple ComfyUI text nodes.
+
+Features:
+- Proper text justification with word spacing and hyphenation
+- Percentage-based positioning with pixel offsets
+- Drop shadows with angle, distance, and blur
+- Full RGBA color support with hex codes (#RRGGBBAA format)
+- Text rotation with selectable pivot point
+- Transparent backgrounds and alpha compositing
+- Smart hyphenation in multiple languages
+- Outputs both rendered image and text mask
+
+Inputs:
+- Required:
+  - `image_width/height`: Output dimensions (ignored if img_composite provided)
+  - `text`: Text to render (supports multiple lines)
+  - `font_name`: TTF font file from fonts directory
+  - `font_size`: Size in pixels
+  - `font_color`: Predefined color or custom hex
+  - `background_color`: Background color with transparency support
+  - `x_percent/y_percent`: Position as percentage of dimensions
+  - `x_offset/y_offset`: Additional pixel offsets
+  - `vertical_align`: top/center/bottom
+  - `horizontal_align`: left/center/right/justify
+  - `shadow_distance/angle/blur`: Shadow parameters
+  - `rotation_angle`: Text rotation in degrees
+  - `language`: Language for hyphenation rules
+- Optional:
+  - `img_composite`: Background image to composite over
+  - `*_color_hex`: Custom colors in #RRGGBBAA format
+
+Outputs:
+- `image`: Rendered text with background/shadow
+- `mask`: Alpha mask of text and shadow
+
+Originally forked from ComfyUI_Comfyroll_CustomNodes Draw Text node, with significant enhancements inspired by comfyui_essentials and ComfyUI-LayerStyle text rendering features.
+
 ## Available Nodes
 
 ### Audio Processing

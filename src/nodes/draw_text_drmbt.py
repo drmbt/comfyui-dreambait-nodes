@@ -1,8 +1,40 @@
-import numpy as np
+"""
+DreamBait Draw Text Node
+
+Originally forked from ComfyUI_Comfyroll_CustomNodes Draw Text node to fix alignment labeling
+and implement true justified text alignment. Subsequently enhanced with features from other
+ComfyUI text nodes (comfyui_essentials, ComfyUI-LayerStyle) to create a comprehensive
+text rendering solution.
+
+Features have been broken out into helper nodes to declutter the interface and allow for more
+granular control:
+- Text Margins: Control individual margin settings (left, right, top, bottom)
+- Text Box Style: Configure background box with padding, borders, and corner rounding
+- Text Shadow: Set shadow parameters including distance, angle, blur and color
+
+Core Features:
+- Proper text justification with word spacing
+- Smart hyphenation support for multiple languages
+- Percentage-based positioning with pixel offsets
+- Drop shadows with angle, distance, and blur
+- Full RGBA color support with hex codes
+- Text rotation with selectable pivot point
+- Transparent backgrounds
+- Image compositing with alpha
+- Outputs both rendered image and text mask
+
+Credits:
+- ComfyUI_Comfyroll_CustomNodes (base implementation)
+- comfyui_essentials (mask handling, tensor operations)
+- ComfyUI-LayerStyle (shadow implementation concepts)
+"""
+
 import torch
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
+import torchvision.transforms.v2 as T
 import pyphen  # Simple import, requirements.txt will handle installation
+import numpy as np
 
 '''
 this node forked from ComfyUI_Comfyroll_CustomNodes draw_text, but corrects mislabled 
@@ -12,13 +44,14 @@ justify and vertical align options, implements justify and properly, adds hyphen
 
 
 # Constants from original
-COLORS = ["custom", "white", "black", "red", "green", "blue", "yellow",
+COLORS = ["custom", "transparent", "white", "black", "red", "green", "blue", "yellow",
           "cyan", "magenta", "orange", "purple", "pink", "brown", "gray",
           "lightgray", "darkgray", "olive", "lime", "teal", "navy", "maroon",
           "fuchsia", "aqua", "silver", "gold", "turquoise", "lavender",
           "violet", "coral", "indigo"]
 
 color_mapping = {
+    "transparent": (0, 0, 0),
     "white": (255, 255, 255),
     "black": (0, 0, 0),
     "red": (255, 0, 0),
@@ -51,7 +84,7 @@ color_mapping = {
 }
 
 VERTICAL_ALIGN_OPTIONS = ["center", "top", "bottom"]
-HORIZONTAL_ALIGN_OPTIONS = ["center", "left", "right", "justify"]
+HORIZONTAL_ALIGN_OPTIONS = ["center", "left", "right"]
 ROTATE_OPTIONS = ["text center", "image center"]
 
 # Add to existing constants
@@ -59,12 +92,12 @@ LANGUAGES = ["en_US", "en_GB", "de_DE", "fr_FR", "es_ES", "it_IT"]  # Add more a
 
 POSITION_MODES = ["pixels", "fraction"]
 
-# Helper functions from functions_graphics.py
+# Update tensor conversion functions
 def tensor2pil(image):
-    return Image.fromarray(np.clip(255. * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
+    return T.ToPILImage()(image.permute([0,3,1,2])[0]).convert('RGBA')
 
 def pil2tensor(image):
-    return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
+    return T.ToTensor()(image).unsqueeze(0).permute([0,2,3,1])
 
 def get_text_size(draw, text, font):
     bbox = draw.textbbox((0, 0), text, font=font)
@@ -96,17 +129,28 @@ def justify_text(justify, img_width, line_width, margins, text=None):
 
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
-    r = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16)
-    b = int(hex_color[4:6], 16)
-    return (r, g, b)
+    if len(hex_color) == 8:  # RGBA
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        a = int(hex_color[6:8], 16) / 255.0  # Convert to float 0-1
+        return (r, g, b), a
+    else:  # RGB
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (r, g, b), None
 
-def get_color_values(color, color_hex, color_mapping):
+def get_color_values(color, color_hex, opacity, color_mapping):
+    """Get RGB color and opacity (0-1)"""
     if color == "custom":
-        color_rgb = hex_to_rgb(color_hex)
+        rgb, hex_opacity = hex_to_rgb(color_hex)
+        opacity = hex_opacity if hex_opacity is not None else opacity
     else:
-        color_rgb = color_mapping.get(color, (0, 0, 0))
-    return color_rgb
+        rgb = color_mapping.get(color, (0, 0, 0))
+        if color == "transparent":
+            opacity = 0
+    return rgb, opacity
 
 def try_hyphenate_word(dic, word, draw, font, remaining_width):
     """Attempt to hyphenate a word to fit the remaining width."""
@@ -181,9 +225,13 @@ def wrap_text(draw, text, font, max_width, margins, language="en_US"):
 
 def draw_masked_text(text_mask, text, font_name, font_size,
                     margins, line_spacing, position_x, position_y,
-                    vertical_align, horizontal_align, rotation_angle, rotation_options):
+                    vertical_align, horizontal_align, rotation_angle, rotation_options,
+                    text_color=(255,255,255,255), justify=False):
     
     draw = ImageDraw.Draw(text_mask)
+    
+    # Track text boundaries
+    text_bounds = [float('inf'), float('inf'), float('-inf'), float('-inf')]
     
     font_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "fonts")
     font_file = os.path.join(font_folder, font_name)
@@ -192,12 +240,15 @@ def draw_masked_text(text_mask, text, font_name, font_size,
     # Get image dimensions
     image_width, image_height = text_mask.size
     
+    # Calculate effective width for text wrapping (accounting for margins)
+    effective_width = image_width - margins["left"] - margins["right"]
+    
     # Split text into paragraphs and wrap each paragraph
     paragraphs = text.split('\n')
     wrapped_lines = []
     for paragraph in paragraphs:
         if paragraph.strip():  # Only process non-empty paragraphs
-            wrapped = wrap_text(draw, paragraph, font, image_width, margins)
+            wrapped = wrap_text(draw, paragraph, font, effective_width, 0)  # Pass 0 for margins since we handle them separately
             wrapped_lines.extend(wrapped)
         else:
             wrapped_lines.append("")  # Preserve empty lines
@@ -211,53 +262,81 @@ def draw_masked_text(text_mask, text, font_name, font_size,
         max_text_width = max(max_text_width, line_width)
         max_text_height = max(max_text_height, line_height)
     
-    image_center_x = image_width / 2
-    image_center_y = image_height / 2
+    # Calculate text area boundaries including margins
+    text_area_x = margins["left"]
+    text_area_width = image_width - margins["left"] - margins["right"]
+    text_area_y = margins["top"]
+    text_area_height = image_height - margins["top"] - margins["bottom"]
 
-    text_pos_y = position_y
+    # Draw each line
+    text_pos_y = position_y + margins["top"]  # Add top margin to starting position
     sum_text_plot_y = 0
     text_height = max_text_height * len(wrapped_lines)
-    last_text_x = margins
+
+    # Adjust vertical alignment to respect margins
+    if vertical_align == "center":
+        text_plot_y = text_area_y + (text_area_height / 2 - text_height / 2) + text_pos_y
+    elif vertical_align == "top":
+        text_plot_y = text_area_y + text_pos_y
+    else:  # bottom
+        text_plot_y = text_area_y + text_area_height - text_height + text_pos_y
 
     # Draw each line
     for i, line in enumerate(wrapped_lines):
         words = line.split()
-        line_width, _ = get_text_size(draw, line, font)
-        
-        text_plot_y = align_text(vertical_align, image_height, text_height, text_pos_y, margins)
+        line_width, line_height = get_text_size(draw, line, font)
         
         # Handle justified text differently
-        if (horizontal_align == "justify" and 
+        if (justify and 
             i < len(wrapped_lines) - 1 and  # Not last line
-            len(words) > 1 and  # More than one word
-            line.strip() and    # Not an empty line
-            i < len(wrapped_lines) - 1 and  # Not the last line of the paragraph
-            wrapped_lines[i + 1].strip()):  # Next line is not empty (paragraph break)
+            len(words) > 1 and
+            line.strip()):
             
             # Calculate total width of words
             word_widths = [get_text_size(draw, word, font)[0] for word in words]
             total_word_width = sum(word_widths)
             
-            # Calculate space to distribute
-            available_width = image_width - 2 * margins
+            # Calculate space to distribute within margins
+            available_width = text_area_width
             total_spacing = available_width - total_word_width
             space_between = total_spacing / (len(words) - 1)
             
             # Draw each word with calculated spacing
-            x = margins + position_x
+            x = text_area_x + position_x
             for j, (word, word_width) in enumerate(zip(words, word_widths)):
-                draw.text((x, text_plot_y), word, fill=255, font=font)
-                if j < len(words) - 1:  # Don't add space after last word
+                word_x = x
+                word_y = text_plot_y
+                draw.text((word_x, word_y), word, fill=text_color, font=font)
+                
+                # Update bounds
+                bbox = draw.textbbox((word_x, word_y), word, font=font)
+                text_bounds[0] = min(text_bounds[0], bbox[0])
+                text_bounds[1] = min(text_bounds[1], bbox[1])
+                text_bounds[2] = max(text_bounds[2], bbox[2])
+                text_bounds[3] = max(text_bounds[3], bbox[3])
+                
+                if j < len(words) - 1:
                     x += word_width + space_between
-            last_text_x = x
         else:
-            # Handle other alignments normally
-            text_plot_x = position_x + justify_text(horizontal_align, image_width, line_width, margins)
-            if line.strip():  # Only draw non-empty lines
-                draw.text((text_plot_x, text_plot_y), line, fill=255, font=font)
-            last_text_x = text_plot_x + line_width
-        
-        text_pos_y += max_text_height
+            # Handle other alignments within margins
+            if horizontal_align == "left":
+                text_plot_x = text_area_x + position_x
+            elif horizontal_align == "right":
+                text_plot_x = text_area_x + text_area_width - line_width + position_x
+            else:  # center
+                text_plot_x = text_area_x + (text_area_width - line_width) / 2 + position_x
+
+            if line.strip():
+                draw.text((text_plot_x, text_plot_y), line, fill=text_color, font=font)
+                
+                # Update bounds
+                bbox = draw.textbbox((text_plot_x, text_plot_y), line, font=font)
+                text_bounds[0] = min(text_bounds[0], bbox[0])
+                text_bounds[1] = min(text_bounds[1], bbox[1])
+                text_bounds[2] = max(text_bounds[2], bbox[2])
+                text_bounds[3] = max(text_bounds[3], bbox[3])
+
+        text_plot_y += max_text_height
         sum_text_plot_y += text_plot_y
 
     # Handle rotation
@@ -267,9 +346,47 @@ def draw_masked_text(text_mask, text, font_name, font_size,
     if rotation_options == "text center":
         rotated_text_mask = text_mask.rotate(rotation_angle, center=(text_center_x, text_center_y))
     else:  # image center
-        rotated_text_mask = text_mask.rotate(rotation_angle, center=(image_center_x, image_center_y))
+        rotated_text_mask = text_mask.rotate(rotation_angle, center=(image_width / 2, image_height / 2))
         
-    return rotated_text_mask
+    text_mask = rotated_text_mask
+    
+    # Rotate bounds if needed
+    if text_bounds != [float('inf'), float('inf'), float('-inf'), float('-inf')]:
+        # Convert bounds to points
+        points = [
+            (text_bounds[0], text_bounds[1]),  # Top-left
+            (text_bounds[2], text_bounds[1]),  # Top-right
+            (text_bounds[2], text_bounds[3]),  # Bottom-right
+            (text_bounds[0], text_bounds[3]),  # Bottom-left
+        ]
+        
+        # Rotate points
+        center = (image_width / 2, image_height / 2) if rotation_options == "image center" else (
+            (text_bounds[0] + text_bounds[2]) / 2,
+            (text_bounds[1] + text_bounds[3]) / 2
+        )
+        
+        angle_rad = np.radians(rotation_angle)
+        cos_a = np.cos(angle_rad)
+        sin_a = np.sin(angle_rad)
+        
+        rotated_points = []
+        for x, y in points:
+            dx = x - center[0]
+            dy = y - center[1]
+            rx = center[0] + dx * cos_a - dy * sin_a
+            ry = center[1] + dx * sin_a + dy * cos_a
+            rotated_points.append((rx, ry))
+        
+        # Update bounds to encompass rotated points
+        text_bounds = [
+            min(p[0] for p in rotated_points),
+            min(p[1] for p in rotated_points),
+            max(p[0] for p in rotated_points),
+            max(p[1] for p in rotated_points)
+        ]
+
+    return text_mask, text_bounds
 
 class DrawText:
     @classmethod
@@ -278,61 +395,437 @@ class DrawText:
         file_list = [f for f in os.listdir(font_dir) if os.path.isfile(os.path.join(font_dir, f)) and f.lower().endswith(".ttf")]
                       
         return {"required": {
-                    "image_width": ("INT", {"default": 512, "min": 64, "max": 2048}),
-                    "image_height": ("INT", {"default": 512, "min": 64, "max": 2048}),  
-                    "text": ("STRING", {"multiline": True, "default": "text"}),
-                    "font_name": (file_list,),
-                    "font_size": ("INT", {"default": 50, "min": 1, "max": 1024}),
-                    "font_color": (COLORS,),
-                    "background_color": (COLORS,),
-                    "vertical_align": (VERTICAL_ALIGN_OPTIONS,),
-                    "horizontal_align": (HORIZONTAL_ALIGN_OPTIONS,),
-                    "x_percent": ("FLOAT", {"default": 50.0, "min": 0.0, "max": 100.0, "step": 0.01}),
-                    "y_percent": ("FLOAT", {"default": 50.0, "min": 0.0, "max": 100.0, "step": 0.01}),
-                    "x_offset": ("INT", {"default": 0, "min": -4096, "max": 4096}),
-                    "y_offset": ("INT", {"default": 0, "min": -4096, "max": 4096}),
-                    "margins": ("INT", {"default": 0, "min": -1024, "max": 1024}),
-                    "line_spacing": ("INT", {"default": 0, "min": -1024, "max": 1024}),
-                    "rotation_angle": ("FLOAT", {"default": 0.0, "min": -360.0, "max": 360.0, "step": 0.1}),
+                    "text": ("STRING", {
+                        "multiline": True, 
+                        "default": "text",
+                        "tooltip": "Text to render. Supports multiple lines"
+                    }),
+                    "image_width": ("INT", {
+                        "default": 512, "min": 64, "max": 2048,
+                        "tooltip": "Width of output image. Ignored if img_composite is provided"
+                    }),
+                    "image_height": ("INT", {
+                        "default": 512, "min": 64, "max": 2048,
+                        "tooltip": "Height of output image. Ignored if img_composite is provided"
+                    }),
+                    "font_name": (file_list, {
+                        "default": "GothamMedium.ttf",
+                        "tooltip": "TTF font file to use from the fonts directory"
+                    }),
+                    "font_size": ("INT", {
+                        "default": 54, "min": 1, "max": 1024,
+                        "tooltip": "Font size in pixels"
+                    }),
+                    "font_color": (COLORS, {
+                        "default": "white",
+                        "tooltip": "Text color. Alpha controlled by opacity unless using 8-digit hex"
+                    }),
+                    "font_opacity": ("FLOAT", {
+                        "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01,
+                        "tooltip": "Text opacity (ignored if using 8-digit hex color)"
+                    }),
+                    "background_color": (COLORS, {
+                        "default": "black",
+                        "tooltip": "Background color. Alpha controlled by opacity unless using 8-digit hex"
+                    }),
+                    "background_opacity": ("FLOAT", {
+                        "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01,
+                        "tooltip": "Background opacity (ignored if using 8-digit hex color)"
+                    }),
+                    "vertical_align": (VERTICAL_ALIGN_OPTIONS, {
+                        "default": "top"
+                    }),
+                    "horizontal_align": (HORIZONTAL_ALIGN_OPTIONS, {
+                        "default": "left",
+                        "tooltip": "Horizontal text alignment"
+                    }),
+                    "justify": ("BOOLEAN", {
+                        "default": False,
+                        "tooltip": "Enable full justification (except last line of paragraph)"
+                    }),
+                    "x_percent": ("FLOAT", {
+                        "default": 0.0, "min": 0.0, "max": 100.0, "step": 0.01,
+                        "tooltip": "Horizontal position as percentage of image width"
+                    }),
+                    "y_percent": ("FLOAT", {
+                        "default": 0.0, "min": 0.0, "max": 100.0, "step": 0.01,
+                        "tooltip": "Vertical position as percentage of image height"
+                    }),
+                    "x_offset": ("INT", {
+                        "default": 0, "min": -4096, "max": 4096,
+                        "tooltip": "Additional horizontal offset in pixels"
+                    }),
+                    "y_offset": ("INT", {
+                        "default": 0, "min": -4096, "max": 4096,
+                        "tooltip": "Additional vertical offset in pixels"
+                    }),
+                    "line_spacing": ("INT", {
+                        "default": 6, "min": -1024, "max": 1024,
+                        "tooltip": "Additional space between lines in pixels"
+                    }),
+                    "rotation_angle": ("FLOAT", {
+                        "default": 0.0, "min": -360.0, "max": 360.0, "step": 0.1,
+                        "tooltip": "Text rotation angle in degrees"
+                    }),
                     "rotation_options": (ROTATE_OPTIONS,),
-                    "language": (LANGUAGES, {"default": "en_US"}),
+                    "language": (LANGUAGES, {
+                        "default": "en_US",
+                        "tooltip": "Language for hyphenation rules"
+                    }),
                 },
                 "optional": {
-                    "font_color_hex": ("STRING", {"multiline": False, "default": "#000000"}),
-                    "bg_color_hex": ("STRING", {"multiline": False, "default": "#000000"})
+                    "font_color_hex": ("STRING", {
+                        "multiline": False, 
+                        "default": "#000000",
+                        "tooltip": "Custom hex color (6 or 8 digits). 8-digit hex overrides opacity"
+                    }),
+                    "bg_color_hex": ("STRING", {
+                        "multiline": False, 
+                        "default": "#000000",
+                        "tooltip": "Custom hex color (6 or 8 digits). 8-digit hex overrides opacity"
+                    }),
+                    "img_composite": ("IMAGE",),
+                    "margins": ("MARGINS",),
+                    "textbox": ("TEXTBOX",),
+                    "shadow": ("SHADOW",),
                 }          
     }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "MASK",)
+    RETURN_NAMES = ("image", "mask",)
     FUNCTION = "draw_text"
     CATEGORY = "DreamBait/Text"
 
     def draw_text(self, image_width, image_height, text,
-                  font_name, font_size, font_color, background_color,
-                  margins, line_spacing, 
-                  x_percent, y_percent, x_offset, y_offset,
-                  vertical_align, horizontal_align, rotation_angle, rotation_options,
+                  font_name, font_size, font_color, font_opacity,
+                  background_color, background_opacity,
+                  vertical_align, horizontal_align,
+                  justify, x_percent, y_percent, x_offset, y_offset,
+                  line_spacing, rotation_angle, rotation_options,
                   language="en_US",
-                  font_color_hex='#000000', bg_color_hex='#000000'):
+                  margins=None, textbox=None, shadow=None,
+                  font_color_hex='#000000', bg_color_hex='#000000',
+                  img_composite=None):
+        
+        # Get default margins if not provided
+        if margins is None:
+            margins = {"left": 0, "right": 0, "top": 0, "bottom": 0}
 
         # Calculate final position from percentage and offset
         pixel_x = int((x_percent / 100.0) * image_width) + x_offset
         pixel_y = int((y_percent / 100.0) * image_height) + y_offset
 
-        text_color = get_color_values(font_color, font_color_hex, color_mapping)
-        bg_color = get_color_values(background_color, bg_color_hex, color_mapping)
+        # Get colors with opacity
+        text_rgb, text_opacity = get_color_values(font_color, font_color_hex, font_opacity, color_mapping)
+        bg_rgb, bg_opacity = get_color_values(background_color, bg_color_hex, background_opacity, color_mapping)
         
-        size = (image_width, image_height)
-        text_image = Image.new('RGB', size, text_color)
-        back_image = Image.new('RGB', size, bg_color)
-        text_mask = Image.new('L', back_image.size)
+        # Convert RGB + opacity to RGBA for PIL
+        text_color = text_rgb + (int(text_opacity * 255),)
+        bg_color = bg_rgb + (int(bg_opacity * 255),)
 
-        rotated_text_mask = draw_masked_text(text_mask, text, font_name, font_size,
-                                           margins, line_spacing,
-                                           pixel_x, pixel_y,
-                                           vertical_align, horizontal_align,
-                                           rotation_angle, rotation_options)
+        # Handle input image if provided
+        if img_composite is not None:
+            img_composite = tensor2pil(img_composite)
+            size = img_composite.size
+            image_width, image_height = size
+            back_image = img_composite
+        else:
+            size = (image_width, image_height)
+            back_image = Image.new('RGBA', size, bg_color)
 
-        image_out = Image.composite(text_image, back_image, rotated_text_mask)
+        # Create text and shadow images
+        text_image = Image.new('RGBA', size)
+        text_mask = Image.new('RGBA', size)
         
-        return (pil2tensor(image_out),) 
+        # Create a temporary transparent background for mask composition
+        mask_background = Image.new('RGBA', size, (0,0,0,0))
+
+        # Get text bounds first
+        temp_mask = Image.new('RGBA', size)
+        _, text_bounds = draw_masked_text(temp_mask, text, font_name, font_size,
+                                        margins, line_spacing,
+                                        pixel_x, pixel_y,
+                                        vertical_align, horizontal_align,
+                                        rotation_angle, rotation_options,
+                                        text_color, justify)
+
+        # Handle text box if provided
+        if textbox is not None:
+            # Get text box colors with opacity
+            box_rgb, box_opacity = get_color_values(textbox["color"], textbox["color_hex"], textbox["opacity"], color_mapping)
+            border_rgb, border_opacity = get_color_values(textbox["border_color"], textbox["border_hex"], textbox["border_opacity"], color_mapping)
+            
+            # Convert to RGBA
+            box_color = box_rgb + (int(box_opacity * 255),)
+            border_color = border_rgb + (int(border_opacity * 255),)
+            
+            # Add padding to text bounds
+            text_bounds = [
+                text_bounds[0] - textbox["padding"]["left"],
+                text_bounds[1] - textbox["padding"]["top"],
+                text_bounds[2] + textbox["padding"]["right"],
+                text_bounds[3] + textbox["padding"]["bottom"]
+            ]
+
+            # Handle full width option
+            if textbox["full_width"]:
+                if horizontal_align == "left":
+                    text_bounds[2] = image_width - margins["right"]
+                elif horizontal_align == "right":
+                    text_bounds[0] = margins["left"]
+                else:  # center or justify
+                    text_bounds[0] = margins["left"]
+                    text_bounds[2] = image_width - margins["right"]
+
+            # Draw text box
+            if box_opacity > 0 or (textbox["border_width"] > 0 and border_opacity > 0):
+                box = draw_rounded_rectangle(
+                    back_image, box_color, border_color,
+                    textbox["border_width"], textbox["corner_radius"],
+                    text_bounds
+                )
+                back_image = Image.alpha_composite(back_image, box)
+                mask_background = Image.alpha_composite(mask_background, box)
+
+        # Handle shadow if provided
+        if shadow is not None and shadow["distance"] > 0:
+            # Get shadow color with opacity
+            shadow_rgb, shadow_opacity = get_color_values(shadow["color"], shadow["color_hex"], shadow["opacity"], color_mapping)
+            shadow_color = shadow_rgb + (int(shadow_opacity * 255),)
+            
+            # Calculate shadow offset
+            shadow_x = int(shadow["distance"] * np.cos(np.radians(shadow["angle"] - rotation_angle)))
+            shadow_y = int(shadow["distance"] * np.sin(np.radians(shadow["angle"] - rotation_angle)))
+
+            # Create and draw shadow
+            shadow_mask = Image.new('RGBA', size)
+            shadow_image, _ = draw_masked_text(shadow_mask, text, font_name, font_size,
+                                             margins, line_spacing,
+                                             pixel_x + shadow_x, 
+                                             pixel_y + shadow_y,
+                                             vertical_align, horizontal_align,
+                                             rotation_angle, rotation_options,
+                                             shadow_color, justify)
+            
+            if shadow["blur"] > 0:
+                shadow_image = shadow_image.filter(ImageFilter.GaussianBlur(shadow["blur"]))
+            
+            back_image = Image.alpha_composite(back_image, shadow_image)
+            mask_background = Image.alpha_composite(mask_background, shadow_image)
+
+        # Draw main text
+        text_mask, _ = draw_masked_text(text_mask, text, font_name, font_size,
+                                      margins, line_spacing,
+                                      pixel_x, pixel_y,
+                                      vertical_align, horizontal_align,
+                                      rotation_angle, rotation_options,
+                                      text_color, justify)
+        
+        text_image = text_mask
+        mask_background = Image.alpha_composite(mask_background, text_image)
+        
+        # Extract mask from complete composition
+        mask = mask_background.split()[3]
+        
+        # Composite text onto background
+        image_out = Image.alpha_composite(back_image, text_image)
+        
+        # Convert to tensors
+        image_tensor = pil2tensor(image_out)
+        mask_tensor = T.ToTensor()(mask).unsqueeze(0)
+
+        return (image_tensor, mask_tensor,)
+
+def draw_rounded_rectangle(image, color, border_color, border_width, corner_radius, bbox, anti_aliasing=2):
+    """Draw a rounded rectangle on the image"""
+    from PIL import ImageDraw
+    
+    # Create mask for filled rectangle
+    fill_mask = Image.new('L', image.size, 0)
+    draw = ImageDraw.Draw(fill_mask)
+    
+    x1, y1, x2, y2 = bbox
+    radius = corner_radius
+    
+    # Draw filled rounded rectangle
+    draw.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=255)
+    
+    # Create box image
+    box = Image.new('RGBA', image.size, (0,0,0,0))
+    
+    # Draw filled box
+    box_filled = Image.new('RGBA', image.size, color)
+    box.paste(box_filled, mask=fill_mask)
+    
+    # Draw border if needed
+    if border_width > 0 and border_color[3] > 0:
+        # Create outer and inner masks for border
+        outer_mask = Image.new('L', image.size, 0)
+        inner_mask = Image.new('L', image.size, 0)
+        
+        draw_outer = ImageDraw.Draw(outer_mask)
+        draw_inner = ImageDraw.Draw(inner_mask)
+        
+        # Draw outer and inner rounded rectangles
+        draw_outer.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=255)
+        draw_inner.rounded_rectangle([x1 + border_width, y1 + border_width, 
+                                    x2 - border_width, y2 - border_width], 
+                                   radius=max(0, radius - border_width), fill=255)
+        
+        # Create border mask by subtracting inner from outer
+        border_mask = ImageChops.subtract(outer_mask, inner_mask)
+        
+        # Apply border
+        border = Image.new('RGBA', image.size, border_color)
+        box = Image.alpha_composite(box, Image.composite(border, box, border_mask))
+    
+    return box 
+
+class TextMargins:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "left": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Left margin in pixels (negative values move text outside bounds)"
+            }),
+            "right": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Right margin in pixels (negative values move text outside bounds)"
+            }),
+            "top": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Top margin in pixels (negative values move text outside bounds)"
+            }),
+            "bottom": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Bottom margin in pixels (negative values move text outside bounds)"
+            }),
+        }}
+    
+    RETURN_TYPES = ("MARGINS",)
+    FUNCTION = "get_margins"
+    CATEGORY = "DreamBait/Text"
+
+    def get_margins(self, left, right, top, bottom):
+        return ({"left": left, "right": right, "top": top, "bottom": bottom},)
+
+class TextBoxStyle:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "color": (COLORS, {
+                "default": "black",
+                "tooltip": "Box fill color. Alpha controlled by opacity unless using 8-digit hex"
+            }),
+            "opacity": ("FLOAT", {
+                "default": 0.2, "min": 0.0, "max": 1.0, "step": 0.01,
+                "tooltip": "Box opacity (ignored if using 8-digit hex color)"
+            }),
+            "border_color": (COLORS, {
+                "default": "black",
+                "tooltip": "Border color. Alpha controlled by border_opacity unless using 8-digit hex"
+            }),
+            "border_opacity": ("FLOAT", {
+                "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01,
+                "tooltip": "Border opacity (ignored if using 8-digit hex color)"
+            }),
+            "border_width": ("INT", {
+                "default": 6, "min": 0, "max": 100,
+                "tooltip": "Border width in pixels"
+            }),
+            "corner_radius": ("INT", {
+                "default": 0, "min": 0, "max": 100,
+                "tooltip": "Corner radius in pixels"
+            }),
+            "padding_left": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Left padding in pixels (negative values shrink the box)"
+            }),
+            "padding_right": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Right padding in pixels (negative values shrink the box)"
+            }),
+            "padding_top": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Top padding in pixels (negative values shrink the box)"
+            }),
+            "padding_bottom": ("INT", {
+                "default": 24, "min": -4096, "max": 4096,
+                "tooltip": "Bottom padding in pixels (negative values shrink the box)"
+            }),
+            "full_width": ("BOOLEAN", {
+                "default": False,
+                "tooltip": "Extend box to margins based on text alignment"
+            }),
+        },
+        "optional": {
+            "color_hex": ("STRING", {
+                "multiline": False,
+                "default": "#FFFFFF",
+                "tooltip": "Custom hex color (6 or 8 digits). 8-digit hex overrides opacity"
+            }),
+            "border_hex": ("STRING", {
+                "multiline": False,
+                "default": "#000000",
+                "tooltip": "Custom border hex color (6 or 8 digits). 8-digit hex overrides border_opacity"
+            }),
+        }}
+    
+    RETURN_TYPES = ("TEXTBOX",)
+    FUNCTION = "get_textbox"
+    CATEGORY = "DreamBait/Text"
+
+    def get_textbox(self, color, opacity, border_color, border_opacity, border_width,
+                   corner_radius, padding_left, padding_right, padding_top, padding_bottom,
+                   full_width, color_hex="#FFFFFF", border_hex="#000000"):
+        return ({"color": color, "opacity": opacity, 
+                "border_color": border_color, "border_opacity": border_opacity,
+                "border_width": border_width, "corner_radius": corner_radius,
+                "padding": {
+                    "left": padding_left, "right": padding_right,
+                    "top": padding_top, "bottom": padding_bottom
+                },
+                "full_width": full_width,
+                "color_hex": color_hex, "border_hex": border_hex},)
+
+class TextShadow:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "color": (COLORS, {
+                "default": "black",
+                "tooltip": "Shadow color. Alpha controlled by opacity unless using 8-digit hex"
+            }),
+            "opacity": ("FLOAT", {
+                "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01,
+                "tooltip": "Shadow opacity (ignored if using 8-digit hex color)"
+            }),
+            "distance": ("INT", {
+                "default": 10, "min": 0, "max": 100, "step": 1,
+                "tooltip": "Shadow distance in pixels. 0 disables shadow"
+            }),
+            "angle": ("FLOAT", {
+                "default": 45.0, "min": -360.0, "max": 360.0, "step": 0.1,
+                "tooltip": "Shadow angle in degrees"
+            }),
+            "blur": ("INT", {
+                "default": 4, "min": 0, "max": 100, "step": 1,
+                "tooltip": "Shadow blur radius in pixels"
+            }),
+        },
+        "optional": {
+            "color_hex": ("STRING", {
+                "multiline": False,
+                "default": "#000000",
+                "tooltip": "Custom hex color (6 or 8 digits). 8-digit hex overrides opacity"
+            }),
+        }}
+    
+    RETURN_TYPES = ("SHADOW",)
+    FUNCTION = "get_shadow"
+    CATEGORY = "DreamBait/Text"
+
+    def get_shadow(self, color, opacity, distance, angle, blur, color_hex="#000000"):
+        return ({"color": color, "opacity": opacity, "distance": distance,
+                "angle": angle, "blur": blur, "color_hex": color_hex},) 

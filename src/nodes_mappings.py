@@ -20,7 +20,7 @@ from .nodes.qwen2_audio_instruct import Qwen2AudioInstruct
 from .nodes.LoadAudioPlus import LoadAudioPlus, PreviewAudioPlus, AudioInfoPlus
 from .nodes.utils import DynamicDictionary, StringToDict, DictToOutputs
 from .nodes.folder_opener import DreambaitFolderOpener
-from .nodes.draw_text_drmbt import DrawText
+from .nodes.draw_text_drmbt import DrawText, TextMargins, TextBoxStyle, TextShadow
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -49,7 +49,10 @@ NODE_CLASS_MAPPINGS = {
     "StringToDict": StringToDict,
     "DictToOutputs": DictToOutputs,
     "DreambaitFolderOpener": DreambaitFolderOpener,
-    "DrawText": DrawText
+    "DrawText": DrawText,
+    "TextMargins": TextMargins,
+    "TextBoxStyle": TextBoxStyle,
+    "TextShadow": TextShadow
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -78,5 +81,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "StringToDict": "Smart Dictionary from String 📝",
     "DictToOutputs": "Dictionary to Outputs 🔀",
     "DreambaitFolderOpener": "Dreambait Folder Opener 📁",
-    "DrawText": "Draw Text 📝"
+    "DrawText": "Draw Text 📝",
+    "TextMargins": "Text Margins",
+    "TextBoxStyle": "Text Box Style",
+    "TextShadow": "Text Shadow"
 }
