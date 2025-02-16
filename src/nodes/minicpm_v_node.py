@@ -10,7 +10,11 @@ import folder_paths
 from huggingface_hub import HfFolder, login, snapshot_download
 from PIL import Image
 import numpy as np
-from moviepy.video.io.VideoFileClip import VideoFileClip
+try:
+    from moviepy import VideoFileClip  # MoviePy 2.x
+except ImportError:
+    from moviepy.video.io.VideoFileClip import VideoFileClip  # MoviePy 1.x
+
 import comfy.model_management as mm
 
 class DownloadAndLoadMiniCPMV:

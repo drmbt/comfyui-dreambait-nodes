@@ -5,7 +5,11 @@ import folder_paths
 import torchaudio
 import torchaudio.backend.sox_io_backend
 import torchaudio.backend.soundfile_backend
-from moviepy.video.io.VideoFileClip import VideoFileClip
+try:
+    from moviepy import VideoFileClip  # MoviePy 2.x
+except ImportError:
+    from moviepy.video.io.VideoFileClip import VideoFileClip  # MoviePy 1.x
+
 import numpy as np
 import random
 import io
