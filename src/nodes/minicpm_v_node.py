@@ -10,7 +10,7 @@ import folder_paths
 from huggingface_hub import HfFolder, login, snapshot_download
 from PIL import Image
 import numpy as np
-from moviepy.video.io.VideoFileClip import VideoFileClip
+from moviepy import VideoFileClip
 import comfy.model_management as mm
 
 class DownloadAndLoadMiniCPMV:
