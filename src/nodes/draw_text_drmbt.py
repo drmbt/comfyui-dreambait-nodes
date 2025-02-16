@@ -507,6 +507,11 @@ class DrawText:
                   font_color_hex='#000000', bg_color_hex='#000000',
                   img_composite=None):
         
+        # Override dimensions if composite image is provided
+        if img_composite is not None:
+            img_composite = tensor2pil(img_composite)
+            image_width, image_height = img_composite.size
+
         # Get default margins if not provided
         if margins is None:
             margins = {"left": 0, "right": 0, "top": 0, "bottom": 0}
@@ -525,9 +530,7 @@ class DrawText:
 
         # Handle input image if provided
         if img_composite is not None:
-            img_composite = tensor2pil(img_composite)
-            size = img_composite.size
-            image_width, image_height = size
+            size = (image_width, image_height)
             back_image = img_composite
         else:
             size = (image_width, image_height)
