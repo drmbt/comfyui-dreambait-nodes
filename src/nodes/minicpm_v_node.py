@@ -13,7 +13,7 @@ import numpy as np
 try:
     from moviepy import VideoFileClip  # MoviePy 2.x
 except ImportError:
-    from moviepy.video.io.VideoFileClip import VideoFileClip  # MoviePy 1.x
+    from moviepy.editor import VideoFileClip  # MoviePy 1.x
 
 import comfy.model_management as mm
 
