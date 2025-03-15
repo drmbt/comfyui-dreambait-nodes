@@ -21,7 +21,15 @@ from tsp_solver.greedy import solve_tsp
 
 ## pip install lpips
 import lpips
-lpips_perceptor = lpips.LPIPS(net='alex').eval().to(device)    # lpips model options: 'squeeze', 'vgg', 'alex'
+
+# Instead of loading at module level, create a function to get the model when needed
+lpips_perceptor = None
+
+def get_lpips_perceptor():
+    global lpips_perceptor
+    if lpips_perceptor is None:
+        lpips_perceptor = lpips.LPIPS(net='alex').eval().to(device)
+    return lpips_perceptor
 
 ################# helper functions #####################
 
@@ -90,8 +98,11 @@ def perceptual_distance(batch_img1, batch_img2, resize_target_pixels_before_comp
     if resize_target_pixels_before_computing_lpips > 0:
         batch_img1, batch_img2 = resize_batch(batch_img1, resize_target_pixels_before_computing_lpips), resize_batch(batch_img2, resize_target_pixels_before_computing_lpips)
 
+    # Get the LPIPS model only when needed
+    perceptor = get_lpips_perceptor()
+    
     # LPIPS model requires images to be in range [-1, 1]:
-    perceptual_distances = lpips_perceptor((2 * batch_img1) - 1, (2 * batch_img2) - 1).mean(dim=(1, 2, 3))
+    perceptual_distances = perceptor((2 * batch_img1) - 1, (2 * batch_img2) - 1).mean(dim=(1, 2, 3))
 
     return perceptual_distances
 
