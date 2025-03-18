@@ -507,15 +507,11 @@ class DrawText:
                   font_color_hex='#000000', bg_color_hex='#000000',
                   img_composite=None):
         
-        # Override dimensions if composite image is provided
+        # Get batch size from input image if provided
+        batch_size = 1
         if img_composite is not None:
-            img_composite = tensor2pil(img_composite)
-            image_width, image_height = img_composite.size
-
-        # Get default margins if not provided
-        if margins is None:
-            margins = {"left": 0, "right": 0, "top": 0, "bottom": 0}
-
+            batch_size = img_composite.shape[0]
+        
         # Calculate final position from percentage and offset
         pixel_x = int((x_percent / 100.0) * image_width) + x_offset
         pixel_y = int((y_percent / 100.0) * image_height) + y_offset
@@ -528,15 +524,19 @@ class DrawText:
         text_color = text_rgb + (int(text_opacity * 255),)
         bg_color = bg_rgb + (int(bg_opacity * 255),)
 
-        # Handle input image if provided
+        # Get image size from the first image in batch if img_composite provided
         if img_composite is not None:
-            size = (image_width, image_height)
-            back_image = img_composite
-        else:
-            size = (image_width, image_height)
-            back_image = Image.new('RGBA', size, bg_color)
+            # Convert first image in batch to determine dimensions
+            first_img = tensor2pil(img_composite[0:1])
+            image_width, image_height = first_img.size
+        
+        size = (image_width, image_height)
+        
+        # Get default margins if not provided
+        if margins is None:
+            margins = {"left": 0, "right": 0, "top": 0, "bottom": 0}
 
-        # Create text and shadow images
+        # Create text and shadow images - only once for the batch
         text_image = Image.new('RGBA', size)
         text_mask = Image.new('RGBA', size)
         
@@ -552,6 +552,9 @@ class DrawText:
                                         rotation_angle, rotation_options,
                                         text_color, justify)
 
+        # Pre-calculate all the text-related elements (box, shadow, text) only once
+        text_elements = Image.new('RGBA', size, (0,0,0,0))
+        
         # Handle text box if provided
         if textbox is not None:
             # Get text box colors with opacity
@@ -583,11 +586,11 @@ class DrawText:
             # Draw text box
             if box_opacity > 0 or (textbox["border_width"] > 0 and border_opacity > 0):
                 box = draw_rounded_rectangle(
-                    back_image, box_color, border_color,
+                    text_elements, box_color, border_color,
                     textbox["border_width"], textbox["corner_radius"],
                     text_bounds
                 )
-                back_image = Image.alpha_composite(back_image, box)
+                text_elements = Image.alpha_composite(text_elements, box)
                 mask_background = Image.alpha_composite(mask_background, box)
 
         # Handle shadow if provided
@@ -613,7 +616,7 @@ class DrawText:
             if shadow["blur"] > 0:
                 shadow_image = shadow_image.filter(ImageFilter.GaussianBlur(shadow["blur"]))
             
-            back_image = Image.alpha_composite(back_image, shadow_image)
+            text_elements = Image.alpha_composite(text_elements, shadow_image)
             mask_background = Image.alpha_composite(mask_background, shadow_image)
 
         # Draw main text
@@ -624,18 +627,80 @@ class DrawText:
                                       rotation_angle, rotation_options,
                                       text_color, justify)
         
-        text_image = text_mask
-        mask_background = Image.alpha_composite(mask_background, text_image)
+        text_elements = Image.alpha_composite(text_elements, text_mask)
+        mask_background = Image.alpha_composite(mask_background, text_mask)
         
         # Extract mask from complete composition
         mask = mask_background.split()[3]
         
-        # Composite text onto background
-        image_out = Image.alpha_composite(back_image, text_image)
+        # Convert the pre-calculated text elements to tensor for later compositing
+        text_elements_tensor = pil2tensor(text_elements)[0]  # Remove the batch dimension
         
-        # Convert to tensors
-        image_tensor = pil2tensor(image_out)
-        mask_tensor = T.ToTensor()(mask).unsqueeze(0)
+        # Initialize output tensors
+        output_images = []
+        output_masks = []
+        
+        # Create base mask tensor
+        base_mask_tensor = T.ToTensor()(mask)  # Shape: [1, H, W]
+        
+        if batch_size > 1:
+            # Process each image in the batch
+            for i in range(batch_size):
+                if img_composite is not None:
+                    # Get the current image from the batch
+                    current_img = tensor2pil(img_composite[i:i+1])
+                else:
+                    # Create a background if no image is provided
+                    current_img = Image.new('RGBA', size, bg_color)
+                
+                # Convert to tensor
+                current_img_tensor = pil2tensor(current_img)[0]  # Remove batch dimension
+                
+                # Add the text elements using torch operations for efficiency
+                # First ensure consistent format
+                if current_img_tensor.shape[-1] == 3:  # RGB
+                    # Convert RGB to RGBA by adding alpha channel
+                    alpha = torch.ones((current_img_tensor.shape[0], current_img_tensor.shape[1], 1), 
+                                      device=current_img_tensor.device)
+                    current_img_tensor = torch.cat([current_img_tensor, alpha], dim=-1)
+                
+                # Alpha composite the tensors
+                # Extract alpha channels
+                img_rgb = current_img_tensor[..., :3]
+                img_a = current_img_tensor[..., 3:4]
+                text_rgb = text_elements_tensor[..., :3]
+                text_a = text_elements_tensor[..., 3:4]
+                
+                # Calculate composite
+                out_a = text_a + img_a * (1.0 - text_a)
+                out_rgb = (text_rgb * text_a + img_rgb * img_a * (1.0 - text_a)) / (out_a + 1e-8)
+                
+                # Combine channels
+                out_rgba = torch.cat([out_rgb, out_a], dim=-1)
+                output_images.append(out_rgba)
+                
+                # Add mask to output masks
+                output_masks.append(base_mask_tensor)
+            
+            # Stack all processed images into a batch - shape [B, H, W, C]
+            image_tensor = torch.stack(output_images, dim=0)
+            # Stack all masks into a batch - shape [B, 1, H, W]
+            mask_tensor = torch.stack(output_masks, dim=0).squeeze(1)  # Remove channel dimension
+            
+        else:
+            # Handle single image case
+            if img_composite is not None:
+                back_image = tensor2pil(img_composite[0])
+            else:
+                back_image = Image.new('RGBA', size, bg_color)
+                
+            # Composite text onto background
+            image_out = Image.alpha_composite(back_image, text_elements)
+            
+            # Convert to tensors
+            image_tensor = pil2tensor(image_out)  # Shape: [1, H, W, C]
+            mask_tensor = base_mask_tensor.unsqueeze(0)  # Shape: [1, 1, H, W]
+            mask_tensor = mask_tensor.squeeze(1)  # Shape: [1, H, W] - correct MASK format
 
         return (image_tensor, mask_tensor,)
 
