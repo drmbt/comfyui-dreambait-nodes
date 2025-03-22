@@ -684,6 +684,8 @@ class DrawText:
             
             # Stack all processed images into a batch - shape [B, H, W, C]
             image_tensor = torch.stack(output_images, dim=0)
+            # Only keep RGB channels (remove alpha)
+            image_tensor = image_tensor[..., :3]
             # Stack all masks into a batch - shape [B, 1, H, W]
             mask_tensor = torch.stack(output_masks, dim=0).squeeze(1)  # Remove channel dimension
             
@@ -699,6 +701,8 @@ class DrawText:
             
             # Convert to tensors
             image_tensor = pil2tensor(image_out)  # Shape: [1, H, W, C]
+            # Only keep RGB channels (remove alpha)
+            image_tensor = image_tensor[..., :3]
             mask_tensor = base_mask_tensor.unsqueeze(0)  # Shape: [1, 1, H, W]
             mask_tensor = mask_tensor.squeeze(1)  # Shape: [1, H, W] - correct MASK format
 
