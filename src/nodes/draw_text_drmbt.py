@@ -94,7 +94,16 @@ POSITION_MODES = ["pixels", "fraction"]
 
 # Update tensor conversion functions
 def tensor2pil(image):
-    return T.ToPILImage()(image.permute([0,3,1,2])[0]).convert('RGBA')
+    # Handle 3D tensor [H,W,C] -> [1,H,W,C]
+    if len(image.shape) == 3:
+        image = image.unsqueeze(0)
+    
+    # Now image is [B,H,W,C]
+    # Permute to [B,C,H,W] for ToPILImage
+    image = image.permute(0,3,1,2)
+    
+    # Convert to PIL and ensure RGBA
+    return T.ToPILImage()(image[0]).convert('RGBA')
 
 def pil2tensor(image):
     return T.ToTensor()(image).unsqueeze(0).permute([0,2,3,1])
@@ -684,6 +693,8 @@ class DrawText:
             
             # Stack all processed images into a batch - shape [B, H, W, C]
             image_tensor = torch.stack(output_images, dim=0)
+            # Only keep RGB channels (remove alpha)
+            image_tensor = image_tensor[..., :3]
             # Stack all masks into a batch - shape [B, 1, H, W]
             mask_tensor = torch.stack(output_masks, dim=0).squeeze(1)  # Remove channel dimension
             
@@ -699,6 +710,8 @@ class DrawText:
             
             # Convert to tensors
             image_tensor = pil2tensor(image_out)  # Shape: [1, H, W, C]
+            # Only keep RGB channels (remove alpha)
+            image_tensor = image_tensor[..., :3]
             mask_tensor = base_mask_tensor.unsqueeze(0)  # Shape: [1, 1, H, W]
             mask_tensor = mask_tensor.squeeze(1)  # Shape: [1, H, W] - correct MASK format
 

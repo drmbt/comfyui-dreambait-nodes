@@ -89,7 +89,8 @@ class LoadAudioPlus:
         input_dir = folder_paths.get_input_directory()
         files = folder_paths.filter_files_content_types(os.listdir(input_dir), ["audio", "video"])
         return {"required": 
-                {"audio": (sorted(files), {"widget": "audio"})},
+                {"audio": (sorted(files), {"widget": "audio"}),
+                 "duration_cap": ("FLOAT", {"default": 0.0, "min": 0.0, "step": 0.1})},
                 "hidden": {"audio_upload": "AUDIO_UPLOAD"}}
 
     CATEGORY = "audio"
@@ -98,7 +99,7 @@ class LoadAudioPlus:
     FUNCTION = "load"
     OUTPUT_NODE = True
 
-    def load(self, audio, audio_upload=None):
+    def load(self, audio, duration_cap=0.0, audio_upload=None):
         # Add output_info parameter to track if audio_info is needed
         output_info = not (hasattr(self, 'return_names_to_compute') and 
                          self.return_names_to_compute is not None and 
@@ -160,6 +161,14 @@ class LoadAudioPlus:
             else:
                 raise RuntimeError(f"Failed to load audio file {audio_path} with any backend. Last error: {str(last_error)}")
 
+        # Apply duration cap if specified
+        if duration_cap > 0:
+            max_samples = int(duration_cap * sample_rate)
+            if waveform.shape[1] > max_samples:
+                waveform = waveform[:, :max_samples]
+                if output_info:
+                    duration = duration_cap
+
         # Create audio data dictionary
         audio_data = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
 
@@ -178,7 +187,7 @@ class LoadAudioPlus:
         return (audio_data, audio_info)
 
     @classmethod
-    def IS_CHANGED(s, audio):
+    def IS_CHANGED(s, audio, duration_cap=0.0):
         image_path = folder_paths.get_annotated_filepath(audio)
         m = hashlib.sha256()
         with open(image_path, 'rb') as f:
@@ -186,7 +195,7 @@ class LoadAudioPlus:
         return m.digest().hex()
 
     @classmethod
-    def VALIDATE_INPUTS(s, audio):
+    def VALIDATE_INPUTS(s, audio, duration_cap=0.0):
         if not folder_paths.exists_annotated_filepath(audio):
             return "Invalid audio file: {}".format(audio)
         return True 
