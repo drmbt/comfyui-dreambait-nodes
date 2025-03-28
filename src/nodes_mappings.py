@@ -21,6 +21,7 @@ from .nodes.LoadAudioPlus import LoadAudioPlus, PreviewAudioPlus, AudioInfoPlus
 from .nodes.utils import DynamicDictionary, StringToDict, DictToOutputs
 from .nodes.folder_opener import DreambaitFolderOpener
 from .nodes.draw_text_drmbt import DrawText, TextMargins, TextBoxStyle, TextShadow
+from .nodes.draw_icons import DrawMana
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -52,7 +53,8 @@ NODE_CLASS_MAPPINGS = {
     "DrawText": DrawText,
     "TextMargins": TextMargins,
     "TextBoxStyle": TextBoxStyle,
-    "TextShadow": TextShadow
+    "TextShadow": TextShadow,
+    "DrawMana": DrawMana
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -84,5 +86,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DrawText": "Draw Text 📝",
     "TextMargins": "Text Margins",
     "TextBoxStyle": "Text Box Style",
-    "TextShadow": "Text Shadow"
+    "TextShadow": "Text Shadow",
+    "DrawMana": "Draw Mana Symbols 🎴"
 }

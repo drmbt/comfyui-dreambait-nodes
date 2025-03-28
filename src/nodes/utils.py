@@ -5,6 +5,7 @@ import os
 #import re
 from pathlib import Path
 import folder_paths
+import ast  # Add this at the top with other imports
 
 FONTS_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "fonts")
 
@@ -81,11 +82,20 @@ class DynamicDictionary:
     CATEGORY = "utils"
     DESCRIPTION = "Creates a dictionary from multiple inputs. Flattens nested dictionaries. Filter by keys using comma or space-separated list. Get values as list or single value."
     
+    def __init__(self):
+        self.unique_id = None  # Will be set by ComfyUI
+        
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {},
             "optional": {
+                "key_lookup": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "placeholder": "New key names (space, comma, or newline separated)",
+                    "tooltip": "Rename keys in order. Leave empty to keep original names."
+                }),
                 "keys": ("STRING", {
                     "default": "*",
                     "multiline": False,
@@ -146,20 +156,31 @@ class DynamicDictionary:
             return "dict"
         return type(value).__name__
 
-    def _flatten_dict(self, d, parent_key=''):
+    def _flatten_dict(self, d, parent_key='', node_id=None):
         """
         Recursively flatten a dictionary, handling both regular dicts and typed dicts.
-        Nested keys are joined with underscores.
+        Now includes node_id for key uniqueness.
         """
         items = {}
+        key_counts = {}
+        
+        def get_unique_key(base_key):
+            full_key = self._get_input_key(base_key, node_id)
+            if full_key not in key_counts:
+                key_counts[full_key] = 1
+                return base_key  # Return clean key for first instance
+            key_counts[full_key] += 1
+            return f"{base_key}{key_counts[full_key]}"  # Add number for duplicates
+        
         for k, v in d.items():
             new_key = f"{parent_key}{k}" if parent_key else k
+            new_key = get_unique_key(new_key)
             
             # If it's our special dict format with type/value
             if isinstance(v, dict) and "type" in v and "value" in v:
                 if isinstance(v["value"], dict):
                     # Recursively flatten the inner dictionary
-                    items.update(self._flatten_dict(v["value"], f"{new_key}_"))
+                    items.update(self._flatten_dict(v["value"], f"{new_key}_", node_id))
                 else:
                     items[new_key] = {
                         "type": self._get_clean_type(v["value"]),
@@ -168,7 +189,7 @@ class DynamicDictionary:
             
             # If it's a regular dictionary
             elif isinstance(v, dict):
-                items.update(self._flatten_dict(v, f"{new_key}_"))
+                items.update(self._flatten_dict(v, f"{new_key}_", node_id))
             
             # If it's a regular value
             else:
@@ -179,18 +200,65 @@ class DynamicDictionary:
                 
         return items
 
-    def combine(self, keys="*", delimiter=", ", **kwargs):
-        # Create flattened dictionary with type information
+    def _get_input_key(self, base_key, node_id):
+        """Create a unique key based on input name and source node ID"""
+        return f"{base_key}_{node_id}" if node_id else base_key
+
+    def combine(self, key_lookup="", keys="*", delimiter=", ", **kwargs):
         complete_dict = {}
+        key_counts = {}
+        
+        # Extract node IDs from input metadata if available
+        input_ids = getattr(self, 'input_ids', {})
+        
+        def get_unique_key(base_key, node_id=None):
+            full_key = self._get_input_key(base_key, node_id)
+            if full_key not in key_counts:
+                key_counts[full_key] = 1
+                return base_key  # Return clean key for first instance
+            key_counts[full_key] += 1
+            return f"{base_key}{key_counts[full_key]}"  # Add number for duplicates
+        
         for k, v in kwargs.items():
+            node_id = input_ids.get(k)  # Get source node ID for this input
             if isinstance(v, dict):
-                complete_dict.update(self._flatten_dict(v))
+                # Pass node ID to flatten_dict
+                flattened = self._flatten_dict(v, node_id=node_id)
+                complete_dict.update(flattened)
             else:
-                complete_dict[k] = {
+                unique_k = get_unique_key(k, node_id)
+                complete_dict[unique_k] = {
                     "type": self._get_clean_type(v),
                     "value": v
                 }
-        
+
+        # Handle key renaming with similar numbering scheme
+        if key_lookup.strip():
+            new_keys = parse_keys(key_lookup)
+            if new_keys:
+                original_keys = list(complete_dict.keys())
+                renamed_dict = {}
+                rename_counts = {}  # Track count of each new key for uniqueness
+                
+                def get_unique_renamed_key(base_key):
+                    if base_key not in rename_counts:
+                        rename_counts[base_key] = 1
+                        return base_key
+                    rename_counts[base_key] += 1
+                    return f"{base_key}{rename_counts[base_key]}"  # Now using number without underscore
+                
+                # Handle explicitly renamed keys
+                for i, new_key in enumerate(new_keys):
+                    if i < len(original_keys):
+                        unique_new_key = get_unique_renamed_key(new_key)
+                        renamed_dict[unique_new_key] = complete_dict[original_keys[i]]
+                
+                # Add remaining unmapped keys
+                for old_key in original_keys[len(new_keys):]:
+                    renamed_dict[old_key] = complete_dict[old_key]
+                
+                complete_dict = renamed_dict
+
         # Create filtered dictionary based on keys
         filtered_dict = complete_dict.copy()
         if parsed_keys := parse_keys(keys):
@@ -230,60 +298,75 @@ def smart_parse_string_to_dict(input_string):
     Intelligently parse a string of key-value pairs into a dictionary.
     Handles various formats and delimiters.
     """
-    # Remove curly braces if present
+    # First try to evaluate as a proper dictionary if it looks like one
     cleaned = input_string.strip()
     if cleaned.startswith('{') and cleaned.endswith('}'):
-        cleaned = cleaned[1:-1]
+        try:
+            # Use ast.literal_eval which safely evaluates strings containing Python expressions
+            return ast.literal_eval(cleaned)
+        except:
+            # If literal_eval fails, remove braces and continue with string parsing
+            cleaned = cleaned[1:-1]
     
-    # Try different common delimiters
+    # Try different common delimiters for string format
     for pair_delimiter in [',', '|', ';', '\n']:
         # Skip if delimiter isn't in string
         if pair_delimiter not in cleaned:
             continue
             
-        pairs = cleaned.split(pair_delimiter)
-        result = {}
-        
-        for pair in pairs:
-            # Skip empty pairs
-            if not pair.strip():
-                continue
-                
-            # Try different key-value separators
-            for kv_separator in [':', '=', '=>', '->']:
-                if kv_separator in pair:
-                    key, value = pair.split(kv_separator, 1)
-                    key = key.strip()
-                    value = value.strip()
+        try:
+            pairs = cleaned.split(pair_delimiter)
+            result = {}
+            
+            for pair in pairs:
+                # Skip empty pairs
+                if not pair.strip():
+                    continue
                     
-                    # Try to parse the value
-                    try:
-                        # Handle lists
-                        if value.startswith('[') and value.endswith(']'):
-                            # Parse simple lists like ['4', 0] or [1, 2, 3]
-                            value = eval(value)
-                        # Handle numbers
-                        elif value.replace('.', '').isdigit():
-                            value = float(value) if '.' in value else int(value)
-                        # Handle booleans
-                        elif value.lower() in ['true', 'false']:
-                            value = value.lower() == 'true'
-                    except:
-                        # Keep as string if parsing fails
-                        pass
-                    
-                    result[key] = value
-                    break
-        
-        # If we found at least one valid key-value pair, return the result
-        if result:
-            return result
+                # Try different key-value separators
+                for kv_separator in [':', '=', '=>', '->']:
+                    if kv_separator in pair:
+                        key, value = pair.split(kv_separator, 1)
+                        key = key.strip()
+                        value = value.strip()
+                        
+                        # Try to parse the value
+                        try:
+                            # Handle lists
+                            if value.startswith('[') and value.endswith(']'):
+                                value = eval(value, {"__builtins__": {}}, {})
+                            # Handle quoted strings
+                            elif (value.startswith('"') and value.endswith('"')) or \
+                                 (value.startswith("'") and value.endswith("'")):
+                                value = value[1:-1]
+                            # Handle numbers
+                            elif value.replace('.', '').isdigit():
+                                value = float(value) if '.' in value else int(value)
+                            # Handle booleans
+                            elif value.lower() in ['true', 'false']:
+                                value = value.lower() == 'true'
+                        except:
+                            # Keep as string if parsing fails
+                            pass
+                        
+                        result[key] = value
+                        break
+            
+            # If we found at least one valid key-value pair, return the result
+            if result:
+                return result
+        except:
+            # If parsing with this delimiter fails, try the next one
+            continue
     
     # If no common delimiters worked, try to parse as a single key-value pair
     for kv_separator in [':', '=', '=>', '->']:
         if kv_separator in cleaned:
-            key, value = cleaned.split(kv_separator, 1)
-            return {key.strip(): value.strip()}
+            try:
+                key, value = cleaned.split(kv_separator, 1)
+                return {key.strip(): value.strip()}
+            except:
+                continue
     
     # If all parsing attempts fail, return empty dict
     return {}
