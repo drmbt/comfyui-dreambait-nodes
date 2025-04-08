@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-dreambait-nodes"
 description = "ComfyUI nodes collection featuring ImageResizeFaceAware, FrameBlend, MiniCPM-V vision-language model, enhanced primitives (Text++, Number++), Load Media, and other package forks and QoL utilities"
-version = "1.2.0"
+version = "1.2.1"
 license = {file = "LICENSE"}
 dependencies = [
     "opencv-python",
