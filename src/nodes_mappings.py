@@ -88,4 +88,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TextBoxStyle": "Text Box Style",
     "TextShadow": "Text Shadow",
     "DrawMana": "Draw Mana Symbols 🎴"
-}
+} 

@@ -55,9 +55,9 @@ class ImageResizeFaceAware:
                     "default": "lanczos",
                     "tooltip": "Method used for interpolation. Lanczos generally gives best quality, nearest is fastest"
                 }),
-                "method": (["stretch", "keep proportion", "fill / crop", "pad", "crop to face", "crop to face (keep_size)"], {
+                "method": (["stretch", "keep proportion", "fill / crop", "pad", "crop to face", "crop to face (keep_size)", "crop to subject"], {
                     "default": "keep proportion",
-                    "tooltip": "Resize method: stretch (distort), keep proportion (scale), fill/crop (fill area and crop excess), pad (add borders), crop to face (detect face and crop+resize), crop to face (keep_size) (square crop to face without resizing)"
+                    "tooltip": "Resize method: stretch (distort), keep proportion (scale), fill/crop (fill area and crop excess), pad (add borders), crop to face/subject (detect and crop+resize), crop to face/subject (keep_size) (square crop without resizing)"
                 }),
                 "condition": (["always", "downscale if bigger", "upscale if smaller", "if bigger area", "if smaller area"], {
                     "default": "always",
@@ -139,6 +139,54 @@ Original Image Resize node by WASasquatch."""
             print(f"Face detection failed: {str(e)}")
             return None  # Return None to trigger center crop fallback
 
+    def find_subject_crop(self, image):
+        try:
+            # Convert the PyTorch tensor to a numpy array
+            image_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
+            
+            # Get image dimensions
+            h_img, w_img = image_np.shape[:2]
+            
+            # Create a saliency detector
+            saliency = cv2.saliency.StaticSaliencySpectralResidual_create()
+            
+            # Convert to grayscale if needed
+            if len(image_np.shape) == 3:
+                gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+            else:
+                gray = image_np
+                
+            # Compute saliency map
+            (success, saliency_map) = saliency.computeSaliency(gray)
+            if not success:
+                return None
+                
+            # Convert to 8-bit
+            saliency_map = (saliency_map * 255).astype(np.uint8)
+            
+            # Find the centroid of the saliency map
+            M = cv2.moments(saliency_map)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+            else:
+                # If moments fail, use center of image
+                cx = w_img // 2
+                cy = h_img // 2
+            
+            # Calculate the square crop size (minimum of image dimensions)
+            crop_size = min(w_img, h_img)
+            
+            # Calculate crop coordinates ensuring the crop stays within image bounds
+            x1 = max(0, min(w_img - crop_size, cx - crop_size//2))
+            y1 = max(0, min(h_img - crop_size, cy - crop_size//2))
+            
+            return [x1, y1, x1 + crop_size, y1 + crop_size]
+            
+        except Exception as e:
+            print(f"Subject detection failed: {str(e)}")
+            return None  # Return None to trigger center crop fallback
+
     def execute(self, image, width, height, method="stretch", interpolation="nearest", condition="always", multiple_of=0):
         _, oh, ow, _ = image.shape
         x = y = x2 = y2 = 0
@@ -148,7 +196,32 @@ Original Image Resize node by WASasquatch."""
             width = width - (width % multiple_of)
             height = height - (height % multiple_of)
 
-        if method == "crop to face" or method == "crop to face (keep_size)":
+        if method == "crop to subject":
+            # Find subject and get crop coordinates
+            crop_coords = self.find_subject_crop(image)
+            
+            if crop_coords is None:
+                # If no subject found, center crop
+                crop_size = min(ow, oh)
+                x = (ow - crop_size) // 2
+                y = (oh - crop_size) // 2
+                x2 = x + crop_size
+                y2 = y + crop_size
+            else:
+                x, y, x2, y2 = crop_coords
+            
+            # Crop the image
+            image = image[:, y:y2, x:x2, :]
+            
+            # Now resize the cropped square to the target size
+            if width == 0:
+                width = height
+            if height == 0:
+                height = width
+                
+            width = height = min(width, height)  # Ensure square output
+
+        elif method == "crop to face" or method == "crop to face (keep_size)":
             # Find face and get crop coordinates
             crop_coords = self.find_face_crop(image, min(width, height))
             
