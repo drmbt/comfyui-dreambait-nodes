@@ -8,14 +8,23 @@ dependencies = [
     "piexif",
     "py7zr",
     "lpips",
-    "tsp_solver2",
+    "tsp_solver",
     "einops",
     "tqdm",
-    "numpy>=1.21.0",
+    "numpy>=1.22.0",
     "torch>=2.0.0",
-    "transformers",
-    "huggingface-hub",
-    "moviepy"
+    "transformers>=4.45.0",
+    "huggingface-hub>=0.19.0",
+    "moviepy",
+    "pyloudnorm>=0.1.0",
+    "sentencepiece>=0.1.99",
+    "pillow>=10.1.0",
+    "bitsandbytes>=0.43.1",
+    "accelerate>=0.30.1",
+    "torchaudio>=2.0.0",
+    "librosa",
+    "pyphen>=0.14.0",
+    "pywin32>=306; platform_system == 'Windows'"
 ]
 
 [project.urls]
