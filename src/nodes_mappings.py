@@ -22,6 +22,7 @@ from .nodes.utils import DynamicDictionary, StringToDict, DictToOutputs
 from .nodes.folder_opener import DreambaitFolderOpener
 from .nodes.draw_text_drmbt import DrawText, TextMargins, TextBoxStyle, TextShadow
 from .nodes.draw_icons import DrawMana
+from .nodes.compare_image_similarity import CompareImageSimilarity
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -54,7 +55,8 @@ NODE_CLASS_MAPPINGS = {
     "TextMargins": TextMargins,
     "TextBoxStyle": TextBoxStyle,
     "TextShadow": TextShadow,
-    "DrawMana": DrawMana
+    "DrawMana": DrawMana,
+    "CompareImageSimilarity": CompareImageSimilarity
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -87,5 +89,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TextMargins": "Text Margins",
     "TextBoxStyle": "Text Box Style",
     "TextShadow": "Text Shadow",
-    "DrawMana": "Draw Mana Symbols 🎴"
-}
+    "DrawMana": "Draw Mana Symbols 🎴",
+    "CompareImageSimilarity": "Compare Image Similarity 🔍"
+} 

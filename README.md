@@ -202,3 +202,38 @@ Technical Details:
 - True-peak limiting prevents inter-sample peaks
 - LUFS measurement considers perceived loudness
 - Handles silence and very quiet audio gracefully
+
+## Compare Image Similarity Node
+
+The Compare Image Similarity node allows you to find the most similar image to an input image from a folder of images. It uses feature extraction and similarity metrics to match images.
+
+Key features:
+- Supports cosine similarity and euclidean distance metrics
+- Can return multiple similar images ranked by similarity
+- Implements efficient caching for faster performance
+- Returns images at their original resolution by default
+
+### Parameters
+
+- **input_image**: The image to compare against
+- **folder_path**: Path to folder containing images to search through
+- **similarity_method**: Method to calculate similarity (cosine or euclidean)
+- **resize_images**: Controls output image dimensions:
+  - `False` (default): Return images at their original resolution
+  - `True`: Resize images to match input image dimensions
+- **return_best_n**: Number of most similar images to return
+- **use_cache**: Use cached embeddings for faster processing
+- **force_refresh_cache**: Force recalculation of embeddings
+- **debug_mode**: Enable detailed debug logging
+
+### Returns
+
+- **image**: The most similar image(s) found
+- **mask**: Corresponding mask(s)
+- **FILE_PATH**: Path to the similar image file
+- **FILE_NAME**: Filename of the similar image
+- **SIMILARITY_SCORE**: Similarity score (higher is more similar)
+
+### How It Works
+
+The node extracts standardized features from all images (including the input image) to perform accurate similarity comparison, but it preserves the original resolution of found images when returning results. This allows you to find visually similar images while maintaining their original quality.
