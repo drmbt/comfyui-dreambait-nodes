@@ -55,7 +55,7 @@ class ImageResizeFaceAware:
                     "default": "lanczos",
                     "tooltip": "Method used for interpolation. Lanczos generally gives best quality, nearest is fastest"
                 }),
-                "method": (["stretch", "keep proportion", "fill / crop", "pad", "crop to face", "crop to face (keep_size)", "crop to subject"], {
+                "method": (["stretch", "keep proportion", "fill / crop", "pad", "crop to face", "crop to face (keep_size)", "crop to subject", "crop to subject (largest square)", "crop to subject (square dimensions)"], {
                     "default": "keep proportion",
                     "tooltip": "Resize method: stretch (distort), keep proportion (scale), fill/crop (fill area and crop excess), pad (add borders), crop to face/subject (detect and crop+resize), crop to face/subject (keep_size) (square crop without resizing)"
                 }),
@@ -139,7 +139,7 @@ Original Image Resize node by WASasquatch."""
             print(f"Face detection failed: {str(e)}")
             return None  # Return None to trigger center crop fallback
 
-    def find_subject_crop(self, image):
+    def find_subject_crop(self, image, target_width=None, target_height=None, crop_mode="default"):
         try:
             # Convert the PyTorch tensor to a numpy array
             image_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
@@ -174,14 +174,35 @@ Original Image Resize node by WASasquatch."""
                 cx = w_img // 2
                 cy = h_img // 2
             
-            # Calculate the square crop size (minimum of image dimensions)
-            crop_size = min(w_img, h_img)
-            
-            # Calculate crop coordinates ensuring the crop stays within image bounds
-            x1 = max(0, min(w_img - crop_size, cx - crop_size//2))
-            y1 = max(0, min(h_img - crop_size, cy - crop_size//2))
-            
-            return [x1, y1, x1 + crop_size, y1 + crop_size]
+            if crop_mode == "largest_square":
+                # Use shortest side of input image
+                crop_size = min(w_img, h_img)
+                x1 = max(0, min(w_img - crop_size, cx - crop_size//2))
+                y1 = max(0, min(h_img - crop_size, cy - crop_size//2))
+                return [x1, y1, x1 + crop_size, y1 + crop_size]
+                
+            elif crop_mode == "square_dimensions":
+                # Use max of target dimensions or shortest side
+                if target_width is not None and target_height is not None:
+                    crop_size = max(min(w_img, h_img), max(target_width, target_height))
+                else:
+                    crop_size = min(w_img, h_img)
+                x1 = max(0, min(w_img - crop_size, cx - crop_size//2))
+                y1 = max(0, min(h_img - crop_size, cy - crop_size//2))
+                return [x1, y1, x1 + crop_size, y1 + crop_size]
+                
+            else:  # default mode - rectangular crop
+                if target_width is None or target_height is None:
+                    # If no target dimensions provided, use shortest side
+                    crop_size = min(w_img, h_img)
+                    x1 = max(0, min(w_img - crop_size, cx - crop_size//2))
+                    y1 = max(0, min(h_img - crop_size, cy - crop_size//2))
+                    return [x1, y1, x1 + crop_size, y1 + crop_size]
+                else:
+                    # Calculate crop coordinates for rectangular crop
+                    x1 = max(0, min(w_img - target_width, cx - target_width//2))
+                    y1 = max(0, min(h_img - target_height, cy - target_height//2))
+                    return [x1, y1, x1 + target_width, y1 + target_height]
             
         except Exception as e:
             print(f"Subject detection failed: {str(e)}")
@@ -196,30 +217,49 @@ Original Image Resize node by WASasquatch."""
             width = width - (width % multiple_of)
             height = height - (height % multiple_of)
 
-        if method == "crop to subject":
+        if method.startswith("crop to subject"):
+            # Determine crop mode based on method
+            crop_mode = "default"
+            if method == "crop to subject (largest square)":
+                crop_mode = "largest_square"
+            elif method == "crop to subject (square dimensions)":
+                crop_mode = "square_dimensions"
+            
             # Find subject and get crop coordinates
-            crop_coords = self.find_subject_crop(image)
+            crop_coords = self.find_subject_crop(image, width, height, crop_mode)
             
             if crop_coords is None:
                 # If no subject found, center crop
-                crop_size = min(ow, oh)
-                x = (ow - crop_size) // 2
-                y = (oh - crop_size) // 2
-                x2 = x + crop_size
-                y2 = y + crop_size
+                if crop_mode == "largest_square" or crop_mode == "square_dimensions":
+                    crop_size = min(ow, oh)
+                    x = (ow - crop_size) // 2
+                    y = (oh - crop_size) // 2
+                    x2 = x + crop_size
+                    y2 = y + crop_size
+                else:
+                    # For rectangular crop, use input dimensions
+                    x = (ow - width) // 2
+                    y = (oh - height) // 2
+                    x2 = x + width
+                    y2 = y + height
             else:
                 x, y, x2, y2 = crop_coords
             
             # Crop the image
             image = image[:, y:y2, x:x2, :]
             
-            # Now resize the cropped square to the target size
-            if width == 0:
-                width = height
-            if height == 0:
-                height = width
+            # For largest square and square dimensions modes, we're done
+            if crop_mode in ["largest_square", "square_dimensions"]:
+                width = int(x2 - x)
+                height = int(y2 - y)
+            else:
+                # For default mode, resize to target dimensions
+                if width == 0:
+                    width = height
+                if height == 0:
+                    height = width
                 
-            width = height = min(width, height)  # Ensure square output
+            #    width = height = min(width, height)  # Ensure square output
 
         elif method == "crop to face" or method == "crop to face (keep_size)":
             # Find face and get crop coordinates

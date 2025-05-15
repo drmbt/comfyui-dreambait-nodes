@@ -57,7 +57,7 @@ class NumberPlusPlus:
                     {
                         "default": 0.0,
                         "step": .001,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "add to value after multiplying"
                     },
                 )

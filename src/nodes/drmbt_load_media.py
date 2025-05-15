@@ -40,6 +40,7 @@ from .sort_visual_path import main as sort_visual_path_main
 import glob
 from typing import Union, List
 import folder_paths
+from .utils import floatOrInt
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
@@ -226,7 +227,8 @@ class LoadMedia:
                 "loop_first_frame": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Append the first frame to the end of the sequence to create seamless loops."
-                })
+                }),
+                "force_rate": (floatOrInt, {"default": 0, "min": 0, "max": 60, "step": 1, "disable": 0})
             }
         }
 
@@ -243,7 +245,7 @@ Key Features:
 - Seamless loop creation with loop_first_frame
 """
         
-    def load_media(self, path, seed, image_load_cap, start_index, start_index_use_seed, error_after_last_frame, skip_n, resize_images_to_first, sort, reverse_order, loop_first_frame):
+    def load_media(self, path, resize_images_to_first, image_load_cap, start_index, start_index_use_seed, seed, error_after_last_frame, skip_n, sort, reverse_order, loop_first_frame, force_rate):
         if start_index_use_seed:
             start_index = seed
 
@@ -379,7 +381,7 @@ Key Features:
                 frame_count = len([f for f in dir_files if os.path.isfile(os.path.join(path, f))])
             # Handle video files
             elif path.lower().endswith(('.mp4', '.mov')):
-                return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+                return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort, force_rate=force_rate)
             # Handle archive files
             elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
                 tmpdirname = self.create_persistent_temp_dir(os.path.splitext(os.path.basename(path))[0])
@@ -428,7 +430,7 @@ Key Features:
             if os.path.isdir(path):
                 return self.load_images_from_folder(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
             elif path.lower().endswith(('.mp4', '.mov')):
-                return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort)
+                return self.load_images_from_movie(path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, reverse_order=reverse_order, resize_images_to_first=resize_images_to_first, parent_directory=parent_directory, sort=sort, force_rate=force_rate)
             elif path.lower().endswith(('.zip', '.tar', '.tar.gz', '.tar.bz2', '.7z')):
                 return self.load_images_from_archive(path=path, image_load_cap=image_load_cap, start_index=start_index, resize_images_to_first=resize_images_to_first, seed=seed, sort=sort, reverse_order=reverse_order, skip_n=skip_n, parent_directory=parent_directory, loop_first_frame=loop_first_frame)
             else:
@@ -615,8 +617,8 @@ Key Features:
             return (image, masks[0], width, height, frame_count, file_name_list[0], file_path_list[0], parent_directory, 1.0, None, prompts[0], metadata_list[0])
         images = torch.cat(images, dim=0)
         return (images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, 1.0, None, prompts, metadata_list)
-    def load_images_from_movie(self, path, image_load_cap, start_index, skip_n, reverse_order, resize_images_to_first, parent_directory, sort):
-        images_from_movie, fps, audio, frame_count = self.extract_images_from_movie(movie_path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n)
+    def load_images_from_movie(self, path, image_load_cap, start_index, skip_n, reverse_order, resize_images_to_first, parent_directory, sort, force_rate):
+        images_from_movie, fps, audio, frame_count = self.extract_images_from_movie(movie_path=path, image_load_cap=image_load_cap, start_index=start_index, skip_n=skip_n, force_rate=force_rate)
         if not images_from_movie:
             raise ValueError(f"No images extracted from movie file: {path}")
 
@@ -759,8 +761,8 @@ Key Features:
         images = torch.cat(images, dim=0)
         return (images, masks, width, height, frame_count, file_name_list, file_path_list, parent_directory, 1.0, None, metadata_list)
 
-    def extract_images_from_movie(self, movie_path, image_load_cap, start_index, skip_n):
-    #    Check if ffmpeg is available in the system's PATH
+    def extract_images_from_movie(self, movie_path, image_load_cap, start_index, skip_n, force_rate=0):
+        # Check if ffmpeg is available in the system's PATH
         ffmpeg_path = shutil.which("ffmpeg")
         ffprobe_path = shutil.which("ffprobe")
 
@@ -784,20 +786,16 @@ Key Features:
             output = probe_result.stdout.strip().split('\n')
             frame_count = int(output[1])  # Convert frame count to int
             fps = float(Fraction(output[0]))  # Convert fps string to float
-        #     print(f"!!!!! frame_count: {frame_count}")
-        #     print(f"!!!!! fps: {fps}")
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to probe video file: {e.stderr}")
             # Fallback to old method
             frame_count = 0
             fps = 30.0  # Default FPS
 
-
         cap = cv2.VideoCapture(movie_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video file: {movie_path}")
 
-       # fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         audio = None
 
@@ -806,25 +804,73 @@ Key Features:
 
         images = []
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_index)
-        for _ in range(image_load_cap if image_load_cap > 0 else total_frames):
+        
+        # Calculate target frame time based on force_rate
+        if force_rate == 0:
+            target_frame_time = 1 / fps
+        else:
+            target_frame_time = 1 / force_rate
+            
+        base_frame_time = 1 / fps
+        time_offset = target_frame_time
+        
+        # Calculate total frames to process
+        if total_frames > 0:
+            if force_rate != 0:
+                yieldable_frames = int(total_frames / fps * force_rate)
+            else:
+                yieldable_frames = total_frames
+            if skip_n > 0:
+                yieldable_frames //= (skip_n + 1)
+            if image_load_cap > 0:
+                yieldable_frames = min(image_load_cap, yieldable_frames)
+        else:
+            yieldable_frames = 0
+
+        frames_added = 0
+        total_frame_count = 0
+        total_frames_evaluated = -1
+        
+        while cap.isOpened() and frames_added < yieldable_frames:
+            if time_offset < target_frame_time:
+                is_returned = cap.grab()
+                if not is_returned:
+                    break
+                time_offset += base_frame_time
+                continue
+                
+            time_offset -= target_frame_time
+            total_frame_count += 1
+            
+            # Skip frames before start_index
+            if total_frame_count <= start_index:
+                continue
+            else:
+                total_frames_evaluated += 1
+                
+            # Skip frames based on skip_n
+            if skip_n > 0 and total_frames_evaluated % (skip_n + 1) != 0:
+                continue
+                
             ret, frame = cap.read()
             if not ret:
                 break
-            if skip_n > 0:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + skip_n)
-                frame_count = len(images)
-            else:
-                frame_count = len(images)
+                
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             images.append(Image.fromarray(frame))
+            frames_added += 1
 
         cap.release()
 
         # Extract audio if available
         audio = lazy_get_audio(movie_path, start_time=0, duration=total_frames / fps)
-        frame_count = total_frames
-        #audio = lazy_get_audio(movie_path, start_time=0, duration=len(images) / fps)
-        return images, fps, audio, frame_count
+        
+        # Update fps if force_rate is set
+        if force_rate > 0:
+            fps = force_rate
+            
+        return images, fps, audio, len(images)
+
     def pil2tensor(self, x):
         return torch.from_numpy(np.array(x).astype(np.float32) / 255.0).unsqueeze(0)
 
