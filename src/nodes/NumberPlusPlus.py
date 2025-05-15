@@ -30,7 +30,7 @@ class NumberPlusPlus:
                     {
                         "default": 0.0,
                         "step": .001,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "pre-add any type float int or legal float wrappable string value to number"
                     },
                 ),
@@ -39,7 +39,7 @@ class NumberPlusPlus:
                     {
                         "default": None,
                         "step": .001,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "override any type float int or legal float wrappable string value to number"
                     },
                 ),
@@ -48,7 +48,7 @@ class NumberPlusPlus:
                     {
                         "default": 1.0,
                         "step": .001,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "multiply the main number"
                     },
                 ),
