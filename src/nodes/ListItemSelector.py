@@ -13,7 +13,7 @@ class ListItemSelector:
                     any_typ,
                     {
                         "default": None,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "Input list or string representation of a list"
                     },
                 ),

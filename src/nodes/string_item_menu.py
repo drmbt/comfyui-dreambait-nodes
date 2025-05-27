@@ -34,7 +34,7 @@ class DRMBT_String_Item_Menu:
                         "default": -1, 
                         "min": 0, 
                         "step": 1, 
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "Input string to be split into menu items."
                     }
                 )

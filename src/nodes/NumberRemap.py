@@ -47,20 +47,11 @@ class NumberRemap:
                 ),
             },
              "optional": {
-                "override_number": (
-                    any_typ, 
-                    {
-                        "default": None,
-                        "defaultInput": True,
-                        "tooltip": "override any type float int or legal float wrappable string value to number"
-                    },
-                    
-                ),
+
                 "pre_multiply": (
                     any_typ, 
                     {
                         "default": 1.000,
-                        "defaultInput": True,
                         "tooltip": "multiply by an optional number"
                     },
                     
@@ -69,7 +60,6 @@ class NumberRemap:
                     any_typ, 
                     {
                         "default": None,
-                        "defaultInput": True,
                         "tooltip": "optional_clamp"
                     },
                     
@@ -78,7 +68,6 @@ class NumberRemap:
                     any_typ, 
                     {
                         "default": None,
-                        "defaultInput": True,
                         "tooltip": "multiply by an optional number"
                     },
                     

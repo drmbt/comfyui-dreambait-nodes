@@ -9,17 +9,17 @@ class SwitchDuo:
         return {
             "required": {
                 "value": ("BOOLEAN", {"default": False}),
-                "on_false1": (any_typ, {"defaultInput": True}),
-                "on_true1": (any_typ, {"defaultInput": True}),
+                "on_false1": (any_typ, {"forceInput": True}),
+                "on_true1": (any_typ, {"forceInput": True}),
             },
             "optional": {
-                "on_false2": (any_typ, {"defaultInput": True}),
-                "on_true2": (any_typ, {"defaultInput": True}),
+                "on_false2": (any_typ, {"forceInput": True}),
+                "on_true2": (any_typ, {"forceInput": True}),
                 "override_switch": (
                     any_typ,
                     {
                         "default": None,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "override any type bool, float int or legal float wrappable string value to number"
                     },
                 )

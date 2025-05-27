@@ -34,7 +34,7 @@ class BoolPlusPlus:
                     any_typ, 
                     {
                         "default": None,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "override any type float int or legal float wrappable string value to number"
                     },
                 ),
@@ -42,7 +42,7 @@ class BoolPlusPlus:
                     any_typ, 
                     {
                         "default": None,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "override any type float int or legal float wrappable string value"
                     },
                 ),
@@ -50,7 +50,7 @@ class BoolPlusPlus:
                     any_typ, 
                     {
                         "default": None,
-                        "defaultInput": True,
+                        "forceInput": True,
                         "tooltip": "override any type float int or legal float wrappable string value"
                     },
                 ),
