@@ -10,9 +10,10 @@ tsp_solver
 lpips
 sentencepiece>=0.1.99
 pillow>=10.1.0
-bitsandbytes>=0.43.1
+bitsandbytes
 accelerate>=0.30.1
 torchaudio>=2.0.0
 librosa
 pywin32>=306; platform_system == "Windows"
 pyphen>=0.14.0
+markdown2>=2.4.0
