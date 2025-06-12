@@ -471,3 +471,71 @@ class DictToOutputs:
         
         # Return dictionary first, then all values
         return (dictionary,) + tuple(output_values)
+
+class DynamicStringConcatenate:
+    """
+    A node that concatenates multiple string inputs using a configurable delimiter.
+    Accepts an arbitrary number of string inputs and combines them with the specified delimiter.
+    """
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("concatenated_string",)
+    FUNCTION = "concatenate"
+    CATEGORY = "utils"
+    DESCRIPTION = "Concatenates multiple string inputs with a configurable delimiter. Supports dynamic input count and smart delimiter parsing."
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {},
+            "optional": {
+                "delimiter": ("STRING", {
+                    "default": ", ",
+                    "multiline": False,
+                    "placeholder": "Delimiter for concatenation (e.g., ', ' or '\\n')",
+                    "tooltip": "Character(s) to separate the input strings. Use \\n for newlines. Leave empty for newlines. Default is ', '."
+                }),
+                "skip_empty": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "If enabled, empty or whitespace-only strings will be skipped during concatenation."
+                }),
+                "trim_whitespace": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "If enabled, leading and trailing whitespace will be removed from each input string before concatenation."
+                })
+            }
+        }
+
+    def concatenate(self, delimiter=", ", skip_empty=True, trim_whitespace=True, **kwargs):
+        # Parse delimiter - handle special cases
+        if not delimiter:
+            # If delimiter is empty or None, use newline
+            parsed_delimiter = "\n"
+        else:
+            # Replace escaped newlines with actual newlines
+            parsed_delimiter = delimiter.replace('\\n', '\n')
+        
+        # Collect all string inputs from kwargs
+        string_inputs = []
+        
+        # Sort kwargs by key to maintain consistent order
+        sorted_inputs = sorted(kwargs.items())
+        
+        for key, value in sorted_inputs:
+            # Convert value to string if it's not already
+            if value is not None:
+                str_value = str(value)
+                
+                # Trim whitespace if requested
+                if trim_whitespace:
+                    str_value = str_value.strip()
+                
+                # Skip empty strings if requested
+                if skip_empty and not str_value:
+                    continue
+                    
+                string_inputs.append(str_value)
+        
+        # Concatenate all strings with the delimiter
+        result = parsed_delimiter.join(string_inputs)
+        
+        return (result,)

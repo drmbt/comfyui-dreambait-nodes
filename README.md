@@ -170,6 +170,31 @@ Outputs:
 
 Originally forked from ComfyUI_Comfyroll_CustomNodes Draw Text node, with significant enhancements inspired by comfyui_essentials and ComfyUI-LayerStyle text rendering features.
 
+#### Dynamic String Concatenate
+
+A utility node that concatenates multiple string inputs using a configurable delimiter with dynamic input handling.
+
+Features:
+- Accepts an arbitrary number of string inputs through dynamic connection
+- Smart delimiter parsing that handles escaped characters
+- Configurable options for handling empty strings and whitespace
+- Automatic conversion of non-string inputs to strings
+
+Inputs:
+- Optional:
+  - `delimiter`: Character(s) to separate strings (default: `, `)
+    - Use `\n` for newlines
+    - Leave empty for newlines 
+    - Supports any custom delimiter
+  - `skip_empty`: Skip empty or whitespace-only strings (default: True)
+  - `trim_whitespace`: Remove leading/trailing whitespace from inputs (default: True)
+  - Dynamic string inputs: Connect any number of strings to concatenate
+
+Output:
+- `concatenated_string`: The combined result of all input strings
+
+The node intelligently handles various input types by converting them to strings, and provides flexible formatting options for different use cases like creating lists, paragraphs, or custom-separated data.
+
 ## Available Nodes
 
 ### Audio Processing

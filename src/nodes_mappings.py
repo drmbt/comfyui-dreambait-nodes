@@ -18,7 +18,7 @@ from .nodes.NormalizeAudio import NormalizeAudio
 from .nodes.minicpm_v_node import MiniCPMVNode, DownloadAndLoadMiniCPMV
 from .nodes.qwen2_audio_instruct import Qwen2AudioInstruct
 from .nodes.LoadAudioPlus import LoadAudioPlus, PreviewAudioPlus, AudioInfoPlus
-from .nodes.utils import DynamicDictionary, StringToDict, DictToOutputs
+from .nodes.utils import DynamicDictionary, StringToDict, DictToOutputs, DynamicStringConcatenate
 from .nodes.folder_opener import DreambaitFolderOpener
 from .nodes.draw_text_drmbt import DrawText, TextMargins, TextBoxStyle, TextShadow
 from .nodes.draw_icons import DrawMana
@@ -50,6 +50,7 @@ NODE_CLASS_MAPPINGS = {
     "DynamicDictionary": DynamicDictionary,
     "StringToDict": StringToDict,
     "DictToOutputs": DictToOutputs,
+    "DynamicStringConcatenate": DynamicStringConcatenate,
     "DreambaitFolderOpener": DreambaitFolderOpener,
     "DrawText": DrawText,
     "TextMargins": TextMargins,
@@ -84,6 +85,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DynamicDictionary": "Dynamic Dictionary",
     "StringToDict": "Smart Dictionary from String 📝",
     "DictToOutputs": "Dictionary to Outputs 🔀",
+    "DynamicStringConcatenate": "Dynamic String Concatenate 🔗",
     "DreambaitFolderOpener": "Dreambait Folder Opener 📁",
     "DrawText": "Draw Text 📝",
     "TextMargins": "Text Margins",
