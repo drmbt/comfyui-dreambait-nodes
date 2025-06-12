@@ -25,8 +25,10 @@ app.registerExtension({
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = async function () {
             const result = onNodeCreated?.apply(this);
-            // Add initial empty string input (lowercase)
-            this.addInput(_EMPTY_PREFIX, _TYPE);
+            // Add initial empty string input (lowercase), only if none exist
+            if (!this.inputs.some(slot => slot.name === _EMPTY_PREFIX)) {
+                this.addInput(_EMPTY_PREFIX, _TYPE);
+            }
             return result;
         }
 
@@ -40,30 +42,11 @@ app.registerExtension({
                 node_slot.name !== 'skip_empty' && 
                 node_slot.name !== 'trim_whitespace') {
                 
-                if (link_info && event === TypeSlotEvent.Connect) {
-                    // When connecting, ensure all string inputs have proper sequential names
-                    this.renameStringInputsSequentially();
-                    
-                    // Add a new empty slot for the next connection
-                    this.addInput(_EMPTY_PREFIX, _TYPE);
-                    
-                } else if (event === TypeSlotEvent.Disconnect) {
-                    // When disconnecting, remove the slot and rename remaining ones
-                    this.removeInput(slot_idx);
-                    this.renameStringInputsSequentially();
-                    
-                    // Ensure we always have at least one empty slot
-                    let hasEmptyStringSlot = this.inputs.some(slot => 
-                        slot.name !== 'delimiter' && 
-                        slot.name !== 'skip_empty' && 
-                        slot.name !== 'trim_whitespace' && 
-                        !slot.link
-                    );
-                    
-                    if (!hasEmptyStringSlot) {
-                        this.addInput(_EMPTY_PREFIX, _TYPE);
-                    }
-                }
+                // Always rename string inputs after any connect/disconnect
+                this.renameStringInputsSequentially();
+
+                // Ensure only one empty slot exists
+                this.ensureSingleEmptyStringSlot();
 
                 this.graph?.setDirtyCanvas(true);
             }
@@ -79,20 +62,38 @@ app.registerExtension({
             );
             
             let connectedCount = 0;
-            
-            // First pass: rename connected slots
+            // First pass: rename connected or filled slots
             for (let slot of stringSlots) {
-                if (slot.link) {
+                // If slot is connected or has a value, give it a sequential name
+                if (slot.link || (slot.widget && slot.widget.value && slot.widget.value.trim())) {
                     connectedCount++;
-                    slot.name = _PREFIX + connectedCount; // "STRING1", "STRING2", "STRING3", etc.
+                    slot.name = _PREFIX + connectedCount; // "STRING1", "STRING2", ...
+                    if (slot.widget) slot.widget.name = _PREFIX + connectedCount;
                 }
             }
-            
-            // Second pass: ensure unconnected slots are named properly
+            // Second pass: all others become the empty slot (will be deduped later)
             for (let slot of stringSlots) {
-                if (!slot.link) {
-                    slot.name = _EMPTY_PREFIX; // Empty slots are always just "string"
+                if (!slot.link && (!slot.widget || !slot.widget.value || !slot.widget.value.trim())) {
+                    slot.name = _EMPTY_PREFIX;
+                    if (slot.widget) slot.widget.name = _EMPTY_PREFIX;
                 }
+            }
+        }
+
+        // Ensure only one empty 'string' slot exists
+        nodeType.prototype.ensureSingleEmptyStringSlot = function() {
+            let emptySlots = this.inputs.filter(slot => 
+                slot.name === _EMPTY_PREFIX && 
+                (!slot.link && (!slot.widget || !slot.widget.value || !slot.widget.value.trim()))
+            );
+            // If more than one empty slot, remove extras
+            for (let i = 1; i < emptySlots.length; i++) {
+                let idx = this.inputs.indexOf(emptySlots[i]);
+                if (idx !== -1) this.removeInput(idx);
+            }
+            // If no empty slot, add one
+            if (emptySlots.length === 0) {
+                this.addInput(_EMPTY_PREFIX, _TYPE);
             }
         }
 
@@ -100,22 +101,10 @@ app.registerExtension({
         const onPropertyChanged = nodeType.prototype.onPropertyChanged;
         nodeType.prototype.onPropertyChanged = function(name, value, prev_value) {
             const result = onPropertyChanged?.apply(this, arguments);
-            
-            // If someone types into an empty string slot, create a new empty slot
-            if (name && name.startsWith(_EMPTY_PREFIX) && value && value.trim() && value !== prev_value) {
-                // Count how many empty slots we have
-                let emptySlots = this.inputs.filter(slot => 
-                    slot.name === _EMPTY_PREFIX && 
-                    (!slot.widget || !slot.widget.value || !slot.widget.value.trim())
-                );
-                
-                // If we don't have any empty slots, add one
-                if (emptySlots.length === 0) {
-                    this.addInput(_EMPTY_PREFIX, _TYPE);
-                    this.graph?.setDirtyCanvas(true);
-                }
-            }
-            
+            // Always rename and ensure only one empty slot
+            this.renameStringInputsSequentially();
+            this.ensureSingleEmptyStringSlot();
+            this.graph?.setDirtyCanvas(true);
             return result;
         }
     },

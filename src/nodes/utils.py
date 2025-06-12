@@ -478,7 +478,7 @@ class DynamicStringConcatenate:
     Accepts an arbitrary number of string inputs and combines them with the specified delimiter.
     """
     OUTPUT_IS_LIST = (False, True)
-    RETURN_TYPES = ("STRING", "LIST",)
+    RETURN_TYPES = ("STRING", "STRING",)
     RETURN_NAMES = ("concatenated_string", "list_strings",)
     FUNCTION = "concatenate"
     CATEGORY = "utils"
@@ -507,37 +507,31 @@ class DynamicStringConcatenate:
         }
 
     def concatenate(self, delimiter=", ", skip_empty=True, trim_whitespace=True, **kwargs):
-        # Parse delimiter - handle special cases
-        if not delimiter:
-            # If delimiter is empty or None, use newline
-            parsed_delimiter = "\n"
-        else:
-            # Replace escaped newlines with actual newlines
-            parsed_delimiter = delimiter.replace('\\n', '\n')
-        
-        # Collect all string inputs from kwargs
+        import re
+        print(f"[DynamicStringConcatenate] kwargs: {kwargs}")
+        # Accept both STRING1, STRING2, ... and string, string_1, string_2, ...
+        def extract_index(key):
+            if re.match(r"^STRING\d+$", key):
+                return int(key[6:])
+            elif key == "string":
+                return 1
+            elif re.match(r"^string_\d+$", key):
+                return int(key[7:]) + 1
+            return 9999
+        # Collect all valid keys
+        string_keys = [k for k in kwargs.keys() if re.match(r"^STRING\d+$", k) or k == "string" or re.match(r"^string_\d+$", k)]
+        string_keys.sort(key=extract_index)
         string_inputs = []
-        
-        # Sort kwargs by key to maintain consistent order
-        sorted_inputs = sorted(kwargs.items())
-        
-        for key, value in sorted_inputs:
-            # Convert value to string if it's not already
+        for key in string_keys:
+            value = kwargs[key]
             if value is not None:
                 str_value = str(value)
-                
-                # Trim whitespace if requested
                 if trim_whitespace:
                     str_value = str_value.strip()
-                
-                # Skip empty strings if requested
                 if skip_empty and not str_value:
                     continue
-                    
                 string_inputs.append(str_value)
-        
-        # Concatenate all strings with the delimiter
+        parsed_delimiter = delimiter.replace('\\n', '\n') if delimiter else '\n'
         result = parsed_delimiter.join(string_inputs)
-        
-        
+        print(f"[DynamicStringConcatenate] result: {result!r}, string_inputs: {string_inputs!r}")
         return (result, string_inputs)
