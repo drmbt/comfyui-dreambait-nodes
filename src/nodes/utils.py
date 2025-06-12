@@ -477,8 +477,9 @@ class DynamicStringConcatenate:
     A node that concatenates multiple string inputs using a configurable delimiter.
     Accepts an arbitrary number of string inputs and combines them with the specified delimiter.
     """
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("concatenated_string",)
+    OUTPUT_IS_LIST = (False, True)
+    RETURN_TYPES = ("STRING", "LIST",)
+    RETURN_NAMES = ("concatenated_string", "list_strings",)
     FUNCTION = "concatenate"
     CATEGORY = "utils"
     DESCRIPTION = "Concatenates multiple string inputs with a configurable delimiter. Supports dynamic input count and smart delimiter parsing."
@@ -538,4 +539,5 @@ class DynamicStringConcatenate:
         # Concatenate all strings with the delimiter
         result = parsed_delimiter.join(string_inputs)
         
-        return (result,)
+        
+        return (result, string_inputs)

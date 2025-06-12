@@ -175,10 +175,11 @@ Originally forked from ComfyUI_Comfyroll_CustomNodes Draw Text node, with signif
 A utility node that concatenates multiple string inputs using a configurable delimiter with dynamic input handling.
 
 Features:
-- Accepts an arbitrary number of string inputs through dynamic connection
+- Accepts an arbitrary number of string inputs through dynamic connection OR manual typing
 - Smart delimiter parsing that handles escaped characters
 - Configurable options for handling empty strings and whitespace
 - Automatic conversion of non-string inputs to strings
+- Dual output: both concatenated string and list of individual strings
 
 Inputs:
 - Optional:
@@ -188,12 +189,15 @@ Inputs:
     - Supports any custom delimiter
   - `skip_empty`: Skip empty or whitespace-only strings (default: True)
   - `trim_whitespace`: Remove leading/trailing whitespace from inputs (default: True)
-  - Dynamic string inputs: Connect any number of strings to concatenate
+  - Dynamic string inputs: 
+    - Connect any number of strings to concatenate (named STRING1, STRING2, etc.)
+    - OR type directly into "string" input fields - new empty fields appear automatically
 
-Output:
-- `concatenated_string`: The combined result of all input strings
+Outputs:
+- `concatenated_string`: The combined result of all input strings with delimiter
+- `list_string`: Array/list of individual string values (useful for further processing)
 
-The node intelligently handles various input types by converting them to strings, and provides flexible formatting options for different use cases like creating lists, paragraphs, or custom-separated data.
+The node intelligently handles various input types by converting them to strings, and provides flexible formatting options for different use cases like creating lists, paragraphs, or custom-separated data. The dual output allows you to use the data as either a single concatenated string or as separate list items.
 
 ## Available Nodes
 

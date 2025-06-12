@@ -12,6 +12,7 @@ const TypeSlotEvent = {
 
 const _ID = "DynamicStringConcatenate";
 const _PREFIX = "STRING";
+const _EMPTY_PREFIX = "string";
 const _TYPE = "STRING";
 
 app.registerExtension({
@@ -24,8 +25,8 @@ app.registerExtension({
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = async function () {
             const result = onNodeCreated?.apply(this);
-            // Add initial string input
-            this.addInput(_PREFIX, _TYPE);
+            // Add initial empty string input (lowercase)
+            this.addInput(_EMPTY_PREFIX, _TYPE);
             return result;
         }
 
@@ -44,7 +45,7 @@ app.registerExtension({
                     this.renameStringInputsSequentially();
                     
                     // Add a new empty slot for the next connection
-                    this.addInput(_PREFIX, _TYPE);
+                    this.addInput(_EMPTY_PREFIX, _TYPE);
                     
                 } else if (event === TypeSlotEvent.Disconnect) {
                     // When disconnecting, remove the slot and rename remaining ones
@@ -60,7 +61,7 @@ app.registerExtension({
                     );
                     
                     if (!hasEmptyStringSlot) {
-                        this.addInput(_PREFIX, _TYPE);
+                        this.addInput(_EMPTY_PREFIX, _TYPE);
                     }
                 }
 
@@ -83,20 +84,39 @@ app.registerExtension({
             for (let slot of stringSlots) {
                 if (slot.link) {
                     connectedCount++;
-                    if (connectedCount === 1) {
-                        slot.name = _PREFIX; // First one is just "STRING"
-                    } else {
-                        slot.name = _PREFIX + connectedCount; // "STRING2", "STRING3", etc.
-                    }
+                    slot.name = _PREFIX + connectedCount; // "STRING1", "STRING2", "STRING3", etc.
                 }
             }
             
             // Second pass: ensure unconnected slots are named properly
             for (let slot of stringSlots) {
                 if (!slot.link) {
-                    slot.name = _PREFIX; // Empty slots are always just "STRING"
+                    slot.name = _EMPTY_PREFIX; // Empty slots are always just "string"
                 }
             }
+        }
+
+        // Add input change handler to detect when users type into empty slots
+        const onPropertyChanged = nodeType.prototype.onPropertyChanged;
+        nodeType.prototype.onPropertyChanged = function(name, value, prev_value) {
+            const result = onPropertyChanged?.apply(this, arguments);
+            
+            // If someone types into an empty string slot, create a new empty slot
+            if (name && name.startsWith(_EMPTY_PREFIX) && value && value.trim() && value !== prev_value) {
+                // Count how many empty slots we have
+                let emptySlots = this.inputs.filter(slot => 
+                    slot.name === _EMPTY_PREFIX && 
+                    (!slot.widget || !slot.widget.value || !slot.widget.value.trim())
+                );
+                
+                // If we don't have any empty slots, add one
+                if (emptySlots.length === 0) {
+                    this.addInput(_EMPTY_PREFIX, _TYPE);
+                    this.graph?.setDirtyCanvas(true);
+                }
+            }
+            
+            return result;
         }
     },
 }); 
