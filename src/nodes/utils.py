@@ -11,6 +11,8 @@ FONTS_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "fonts")
 
 SCRIPT_DIR = Path(__file__).parent
 
+DEBUG = False  # Set to True to enable debug logging
+
 class MultiInput(str):
     def __new__(cls, string, allowed_types="*"):
         res = super().__new__(cls, string)
@@ -508,7 +510,8 @@ class DynamicStringConcatenate:
 
     def concatenate(self, delimiter=", ", skip_empty=True, trim_whitespace=True, **kwargs):
         import re
-        print(f"[DynamicStringConcatenate] kwargs: {kwargs}")
+        if DEBUG:
+            print(f"[DynamicStringConcatenate] kwargs: {kwargs}")
         # Accept both STRING1, STRING2, ... and string, string_1, string_2, ...
         def extract_index(key):
             if re.match(r"^STRING\d+$", key):
@@ -533,5 +536,6 @@ class DynamicStringConcatenate:
                 string_inputs.append(str_value)
         parsed_delimiter = delimiter.replace('\\n', '\n') if delimiter else '\n'
         result = parsed_delimiter.join(string_inputs)
-        print(f"[DynamicStringConcatenate] result: {result!r}, string_inputs: {string_inputs!r}")
+        if DEBUG:
+            print(f"[DynamicStringConcatenate] result: {result!r}, string_inputs: {string_inputs!r}")
         return (result, string_inputs)
