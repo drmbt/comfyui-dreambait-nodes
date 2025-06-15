@@ -79,30 +79,52 @@ class DreambaitFolderOpener:
 
     @classmethod
     def get_node_path(cls, class_type):
-        """Get the package path for a given node class type"""
         try:
-            # Get the custom_nodes directory path
+            print(f"[Folder Opener] Looking for class_type: {class_type}")
             custom_nodes_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             comfy_root = os.path.dirname(custom_nodes_path)
-            
-            # Try to find the node in ComfyUI's node database
             if hasattr(nodes, "NODE_CLASS_MAPPINGS"):
+                print(f"[Folder Opener] NODE_CLASS_MAPPINGS keys: {list(nodes.NODE_CLASS_MAPPINGS.keys())}")
                 node_class = nodes.NODE_CLASS_MAPPINGS.get(class_type)
+                print(f"[Folder Opener] node_class: {node_class}")
                 if node_class:
-                    # Get the module name from the class
-                    module_name = node_class.__module__.split('.')[0]
-                    
+                    module_name = getattr(node_class, "__module__", None)
+                    print(f"[Folder Opener] module_name: {module_name}")
+                    module_base = module_name.split('.')[0] if module_name else None
+                    package_name = getattr(node_class, "__package__", None)
+                    print(f"[Folder Opener] package_name: {package_name}")
+                    # Try to get the file path of the class
+                    class_file = getattr(sys.modules.get(module_name, None), "__file__", None)
+                    print(f"[Folder Opener] class_file: {class_file}")
+                    # Try to infer nodepack from file path
+                    nodepack_name = None
+                    if class_file and "custom_nodes" in class_file:
+                        parts = class_file.split(os.sep)
+                        if "custom_nodes" in parts:
+                            idx = parts.index("custom_nodes")
+                            if len(parts) > idx + 1:
+                                nodepack_name = parts[idx + 1]
+                    print(f"[Folder Opener] nodepack_name: {nodepack_name}")
                     # If it's a built-in node (not in custom_nodes)
-                    if module_name in ['nodes', 'comfy', 'comfy_extras']:
+                    if module_base in ['nodes', 'comfy', 'comfy_extras']:
+                        print(f"[Folder Opener] Built-in node, returning comfy_root: {comfy_root}")
                         return comfy_root
-                    
-                    # Look for a directory matching the module name for custom nodes
+                    # Try using nodepack_name if found
+                    if nodepack_name:
+                        nodepack_path = os.path.join(custom_nodes_path, nodepack_name)
+                        print(f"[Folder Opener] Trying nodepack_path: {nodepack_path}")
+                        if os.path.isdir(nodepack_path):
+                            print(f"[Folder Opener] Found nodepack dir by nodepack_name: {nodepack_path}")
+                            return nodepack_path
+                    # Fallback: Look for a directory matching the module name for custom nodes
                     for dir_name in os.listdir(custom_nodes_path):
-                        if dir_name.lower().replace('-', '_').replace('.', '_') == module_name.lower().replace('-', '_').replace('.', '_'):
+                        print(f"[Folder Opener] Checking dir: {dir_name}")
+                        if module_base and dir_name.lower().replace('-', '_').replace('.', '_') == module_base.lower().replace('-', '_').replace('.', '_'):
                             dir_path = os.path.join(custom_nodes_path, dir_name)
                             if os.path.isdir(dir_path):
+                                print(f"[Folder Opener] Found custom node dir by module_base: {dir_path}")
                                 return dir_path
-            
+            print(f"[Folder Opener] Could not find package path for {class_type}")
             return None
         except Exception as e:
             print(f"[Folder Opener] Error: {e}")

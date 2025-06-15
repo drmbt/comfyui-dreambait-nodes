@@ -23,6 +23,7 @@ from .nodes.folder_opener import DreambaitFolderOpener
 from .nodes.draw_text_drmbt import DrawText, TextMargins, TextBoxStyle, TextShadow
 from .nodes.draw_icons import DrawMana
 from .nodes.compare_image_similarity import CompareImageSimilarity
+from .nodes.shot_history import ShotHistory
 
 NODE_CLASS_MAPPINGS = {
     "DRMBT_AspectPadImageForOutpainting": AspectPadImageForOutpainting,
@@ -57,7 +58,8 @@ NODE_CLASS_MAPPINGS = {
     "TextBoxStyle": TextBoxStyle,
     "TextShadow": TextShadow,
     "DrawMana": DrawMana,
-    "CompareImageSimilarity": CompareImageSimilarity
+    "CompareImageSimilarity": CompareImageSimilarity,
+    "ShotHistory": ShotHistory
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -92,5 +94,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TextBoxStyle": "Text Box Style",
     "TextShadow": "Text Shadow",
     "DrawMana": "Draw Mana Symbols 🎴",
-    "CompareImageSimilarity": "Compare Image Similarity 🔍"
+    "CompareImageSimilarity": "Compare Image Similarity 🔍",
+    "ShotHistory": "Shot History"
 } 
