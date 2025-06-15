@@ -100,16 +100,4 @@ class NumberPlusPlus:
         float_string = f"{output_number:.3f}"
         int_string = f"{output_int:.0f}"
         bool = output_number>0
-        return {
-            "ui": {
-                "output_number": [output_number],  # Ensure these are lists
-                "output_int": [output_int],
-                "bool>0": [bool],                  # Ensure these are lists
-                "float_string": [float_string],    # Ensure these are lists
-                "int_string": [int_string],        # Ensure these are lists
-                "pre_add": [pre_add],              # Ensure these are lists
-                "multiplier": [multiplier],        # Ensure these are lists
-                "post_add": [post_add]
-            },
-            "result": (output_number, output_int, bool, float_string, int_string, pre_add, multiplier, post_add)
-        }
+        return (output_number, output_int, bool, float_string, int_string, pre_add, multiplier, post_add)

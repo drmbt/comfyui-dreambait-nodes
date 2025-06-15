@@ -156,14 +156,4 @@ class BoolPlusPlus:
                 output_string = str(on_true)
                 output_any = on_true
 
-        return {
-            "ui": {
-                "BOOL": [output_bool],
-                "BOOL_STRING": [str(output_bool)],  # Ensure these are lists
-                "INT": [output_int],
-                "FLOAT": [output_float],                  # Ensure these are lists
-                "STRING": [output_string],    # Ensure these are lists
-                "ANY": [output_any]
-            },
-            "result": (output_bool, str(output_bool), output_int, output_float, output_string, output_any)
-        }
+        return (output_bool, str(output_bool), output_int, output_float, output_string, output_any)

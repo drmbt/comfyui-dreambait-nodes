@@ -48,8 +48,9 @@ class TextPlusPlus:
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("text", "prepend", "body", "append")
     OUTPUT_NODE = True
+    OUTPUT_IS_LIST = (False,)
     FUNCTION = "text_assemble"
-    CATEGORY = "DRMBT nodes"
+    CATEGORY = "DRMBT nodes"    
 
     @classmethod
     def IS_CHANGED(cls, body, prepend, append, delimiter):
@@ -66,7 +67,6 @@ class TextPlusPlus:
             if append != "":
                 append = f"{delimiter}{append}" 
             text = f"{prepend}{body}{append}"
-            return {"ui": {"text": text, "prepend": prepend, "body": body, "append": append}, 
-                   "result": (text, prepend, body, append)}
+            return (text, prepend, body, append)
         except UnicodeError as e:
             raise ValueError(f"Invalid text or delimiter encoding: {str(e)}")
