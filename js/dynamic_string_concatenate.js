@@ -22,90 +22,83 @@ app.registerExtension({
             return;
         }
 
-        const onNodeCreated = nodeType.prototype.onNodeCreated;
-        nodeType.prototype.onNodeCreated = async function () {
-            const result = onNodeCreated?.apply(this);
-            // Add initial empty string input (lowercase), only if none exist
-            if (!this.inputs.some(slot => slot.name === _EMPTY_PREFIX)) {
-                this.addInput(_EMPTY_PREFIX, _TYPE);
-            }
-            return result;
-        }
-
-        const onConnectionsChange = nodeType.prototype.onConnectionsChange;
-        nodeType.prototype.onConnectionsChange = function (slotType, slot_idx, event, link_info, node_slot) {
-            const result = onConnectionsChange?.apply(this, arguments);
-
-            // Only handle input connections, and skip the control inputs (delimiter, skip_empty, trim_whitespace)
-            if (slotType === TypeSlot.Input && 
-                node_slot.name !== 'delimiter' && 
-                node_slot.name !== 'skip_empty' && 
-                node_slot.name !== 'trim_whitespace') {
-                
-                // Always rename string inputs after any connect/disconnect
-                this.renameStringInputsSequentially();
-
-                // Ensure only one empty slot exists
-                this.ensureSingleEmptyStringSlot();
-
-                this.graph?.setDirtyCanvas(true);
-            }
-            return result;
-        }
-
-        // Add helper method to rename string inputs sequentially
-        nodeType.prototype.renameStringInputsSequentially = function() {
-            let stringSlots = this.inputs.filter(slot => 
-                slot.name !== 'delimiter' && 
-                slot.name !== 'skip_empty' && 
+        // Gets all dynamic string inputs
+        const getDynamicStringInputs = (node) => {
+            return node.inputs.filter(slot =>
+                slot.name !== 'delimiter' &&
+                slot.name !== 'skip_empty' &&
                 slot.name !== 'trim_whitespace'
             );
-            
+        };
+
+        // The core function to manage inputs
+        nodeType.prototype.updateDynamicInputs = function() {
+            let stringInputs = getDynamicStringInputs(this);
             let connectedCount = 0;
-            // First pass: rename connected or filled slots
-            for (let slot of stringSlots) {
-                // If slot is connected or has a value, give it a sequential name
-                if (slot.link || (slot.widget && slot.widget.value && slot.widget.value.trim())) {
+
+            // First pass: rename everything based on its state
+            for (const slot of stringInputs) {
+                const isConnected = !!slot.link;
+                const hasText = slot.widget && slot.widget.value && String(slot.widget.value).trim();
+                if (isConnected || hasText) {
                     connectedCount++;
-                    slot.name = _PREFIX + connectedCount; // "STRING1", "STRING2", ...
-                    if (slot.widget) slot.widget.name = _PREFIX + connectedCount;
-                }
-            }
-            // Second pass: all others become the empty slot (will be deduped later)
-            for (let slot of stringSlots) {
-                if (!slot.link && (!slot.widget || !slot.widget.value || !slot.widget.value.trim())) {
+                    const newName = _PREFIX + connectedCount;
+                    slot.name = newName;
+                    if (slot.widget) slot.widget.name = newName;
+                } else {
                     slot.name = _EMPTY_PREFIX;
                     if (slot.widget) slot.widget.name = _EMPTY_PREFIX;
                 }
             }
-        }
 
-        // Ensure only one empty 'string' slot exists
-        nodeType.prototype.ensureSingleEmptyStringSlot = function() {
-            let emptySlots = this.inputs.filter(slot => 
-                slot.name === _EMPTY_PREFIX && 
-                (!slot.link && (!slot.widget || !slot.widget.value || !slot.widget.value.trim()))
-            );
-            // If more than one empty slot, remove extras
-            for (let i = 1; i < emptySlots.length; i++) {
-                let idx = this.inputs.indexOf(emptySlots[i]);
-                if (idx !== -1) this.removeInput(idx);
+            // Second pass: remove duplicate empty slots
+            const emptySlots = this.inputs.filter(slot => slot.name === _EMPTY_PREFIX);
+            for (let i = emptySlots.length - 1; i > 0; i--) {
+                const slotToRemove = emptySlots[i];
+                const index = this.inputs.indexOf(slotToRemove);
+                if (index > -1) {
+                    this.removeInput(index);
+                }
             }
-            // If no empty slot, add one
-            if (emptySlots.length === 0) {
+            
+            // Final pass: ensure at least one empty slot exists if all are used
+            stringInputs = getDynamicStringInputs(this);
+            const hasEmptySlot = stringInputs.some(slot => slot.name === _EMPTY_PREFIX);
+            if (!hasEmptySlot) {
                 this.addInput(_EMPTY_PREFIX, _TYPE);
             }
-        }
 
-        // Add input change handler to detect when users type into empty slots
+            this.graph?.setDirtyCanvas(true);
+        };
+
+        const onNodeCreated = nodeType.prototype.onNodeCreated;
+        nodeType.prototype.onNodeCreated = function () {
+            const result = onNodeCreated?.apply(this, arguments);
+            setTimeout(() => {
+                if (!this.inputs.some(slot => slot.name === _EMPTY_PREFIX)) {
+                    this.addInput(_EMPTY_PREFIX, _TYPE);
+                }
+                this.updateDynamicInputs();
+            }, 10);
+            return result;
+        };
+
+        const onConnectionsChange = nodeType.prototype.onConnectionsChange;
+        nodeType.prototype.onConnectionsChange = function (slotType, slot_idx, event, link_info, node_slot) {
+            const result = onConnectionsChange?.apply(this, arguments);
+            if (slotType === TypeSlot.Input) {
+                this.updateDynamicInputs();
+            }
+            return result;
+        };
+
         const onPropertyChanged = nodeType.prototype.onPropertyChanged;
         nodeType.prototype.onPropertyChanged = function(name, value, prev_value) {
             const result = onPropertyChanged?.apply(this, arguments);
-            // Always rename and ensure only one empty slot
-            this.renameStringInputsSequentially();
-            this.ensureSingleEmptyStringSlot();
-            this.graph?.setDirtyCanvas(true);
+            if (name !== 'delimiter' && name !== 'skip_empty' && name !== 'trim_whitespace') {
+                this.updateDynamicInputs();
+            }
             return result;
-        }
+        };
     },
 }); 
