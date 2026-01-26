@@ -3,8 +3,6 @@ import os
 import hashlib
 import folder_paths
 import torchaudio
-import torchaudio.backend.sox_io_backend
-import torchaudio.backend.soundfile_backend
 try:
     from moviepy import VideoFileClip  # MoviePy 2.x
 except ImportError:
@@ -139,27 +137,17 @@ class LoadAudioPlus:
             except Exception as e:
                 raise RuntimeError(f"Error loading video file {audio_path}: {str(e)}")
         else:
-            backends = [
-                (torchaudio.backend.soundfile_backend, "soundfile"),
-                (torchaudio.backend.sox_io_backend, "sox_io")
-            ]
-            
-            last_error = None
-            for backend, name in backends:
-                try:
-                    torchaudio.set_audio_backend(name)
-                    waveform, sample_rate = torchaudio.load(audio_path)
-                    if output_info:
-                        num_channels = waveform.shape[0]
-                        duration = waveform.shape[1] / sample_rate
-                    else:
-                        num_channels = None
-                        duration = None
-                    break
-                except Exception as e:
-                    last_error = e
-            else:
-                raise RuntimeError(f"Failed to load audio file {audio_path} with any backend. Last error: {str(last_error)}")
+            # In torchaudio 2.9+, backend system was removed and load() uses TorchCodec directly
+            try:
+                waveform, sample_rate = torchaudio.load(audio_path)
+                if output_info:
+                    num_channels = waveform.shape[0]
+                    duration = waveform.shape[1] / sample_rate
+                else:
+                    num_channels = None
+                    duration = None
+            except Exception as e:
+                raise RuntimeError(f"Failed to load audio file {audio_path}: {str(e)}")
 
         # Apply duration cap if specified
         if duration_cap > 0:
