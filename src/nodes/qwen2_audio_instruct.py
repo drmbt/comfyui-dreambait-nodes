@@ -6,7 +6,7 @@ from transformers import (
     Qwen2AudioForConditionalGeneration, 
     AutoProcessor,
 )
-from huggingface_hub import login, HfFolder
+from huggingface_hub import login, get_token
 import comfy.model_management as mm
 
 class Qwen2AudioInstruct:
@@ -62,7 +62,7 @@ class Qwen2AudioInstruct:
         # Download model if needed
         if not os.path.exists(cache_dir):
             print(f"Downloading {model} to: {cache_dir}")
-            token = os.getenv('HF_TOKEN') or HfFolder.get_token()
+            token = os.getenv('HF_TOKEN') or get_token()
             if not token:
                 raise ValueError(
                     "This model requires authentication. Please:\n"

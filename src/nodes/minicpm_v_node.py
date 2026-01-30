@@ -7,7 +7,7 @@ from transformers import (
     AutoModel
 )
 import folder_paths
-from huggingface_hub import HfFolder, login, snapshot_download
+from huggingface_hub import get_token, login, snapshot_download
 from PIL import Image
 import numpy as np
 try:
@@ -79,7 +79,7 @@ class DownloadAndLoadMiniCPMV:
 
         if not os.path.exists(cache_dir):
             print(f"Downloading {model_version} to: {cache_dir}")
-            token = os.getenv('HF_TOKEN') or HfFolder.get_token()
+            token = os.getenv('HF_TOKEN') or get_token()
             if not token:
                 raise ValueError(
                     "This model requires authentication. Please:\n"
